@@ -1,0 +1,27 @@
+{
+  "name": "tora",
+  "private": true,
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "build:web": "pnpm --filter web build",
+    "lint:web": "pnpm --filter web lint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JosePintos/tora.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/JosePintos/tora/issues"
+  },
+  "homepage": "https://github.com/JosePintos/tora#readme"
+}
