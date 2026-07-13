@@ -6,6 +6,7 @@ import (
 	"github.com/JosePintos/tora/apps/api/internal/platform/database/sqlc"
 	"github.com/JosePintos/tora/apps/api/internal/user/application/ports"
 	"github.com/JosePintos/tora/apps/api/internal/user/domain"
+	"github.com/google/uuid"
 )
 
 type Repository struct {
@@ -24,7 +25,7 @@ func (r *Repository) Create(ctx context.Context, user *domain.User) error {
 	return err
 }
 
-func (r *Repository) GetByID(ctx context.Context, id string) (*domain.User, error) {
+func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	panic("not implemented")
 }
 
