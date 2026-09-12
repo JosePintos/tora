@@ -2,6 +2,18 @@
 
 package model
 
+type CreateDeckInput struct {
+	OwnerID string `json:"ownerId"`
+	Name    string `json:"name"`
+}
+
+type Deck struct {
+	ID        string `json:"id"`
+	OwnerID   string `json:"ownerId"`
+	Name      string `json:"name"`
+	CreatedAt string `json:"createdAt"`
+}
+
 type Mutation struct {
 }
 

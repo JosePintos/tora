@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,11 +25,16 @@ func (u User) IsRegistered() bool {
 	return u.ID != uuid.Nil
 }
 
-func NewUser(username, passwordHash string) *User {
+func NewUser(username, passwordHash string) (*User, error) {
+
+	if strings.TrimSpace(username) == "" {
+		return nil, errors.New("username cannot be empty")
+	}
+
 	return &User{
 		ID:           uuid.New(),
 		Username:     username,
 		PasswordHash: passwordHash,
 		CreatedAt:    time.Now(),
-	}
+	}, nil
 }
