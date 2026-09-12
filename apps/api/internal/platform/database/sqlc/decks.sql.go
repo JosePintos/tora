@@ -51,6 +51,24 @@ func (q *Queries) CreateDeck(ctx context.Context, arg CreateDeckParams) (Deck, e
 	return i, err
 }
 
+const getDeckByID = `-- name: GetDeckByID :one
+SELECT id, owner_id, name, created_at
+FROM decks
+WHERE id = $1
+`
+
+func (q *Queries) GetDeckByID(ctx context.Context, id pgtype.UUID) (Deck, error) {
+	row := q.db.QueryRow(ctx, getDeckByID, id)
+	var i Deck
+	err := row.Scan(
+		&i.ID,
+		&i.OwnerID,
+		&i.Name,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listDecksByOwner = `-- name: ListDecksByOwner :many
 SELECT id, owner_id, name, created_at
 FROM decks

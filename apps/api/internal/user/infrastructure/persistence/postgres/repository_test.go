@@ -16,10 +16,12 @@ func TestCreateUser(t *testing.T) {
 
 	repo := New(queries)
 
-	user := domain.NewUser("testuser", "hashed_password")
-
-	err := repo.Create(context.Background(), user)
+	user, err := domain.NewUser("testuser", "hashed_password")
 	if err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+
+	if err := repo.Create(context.Background(), user); err != nil {
 		t.Fatalf("failed to create user: %v", err)
 	}
 

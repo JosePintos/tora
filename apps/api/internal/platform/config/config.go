@@ -8,6 +8,7 @@ type Config struct {
 	Environment string
 	Server      ServerConfig
 	Database    DatabaseConfig
+	JWT         JWTConfig
 }
 
 type ServerConfig struct {
@@ -16,6 +17,10 @@ type ServerConfig struct {
 
 type DatabaseConfig struct {
 	URL string
+}
+
+type JWTConfig struct {
+	Secret string
 }
 
 func Load() *Config {
@@ -32,6 +37,9 @@ func Load() *Config {
 		},
 		Database: DatabaseConfig{
 			URL: os.Getenv("DATABASE_URL"),
+		},
+		JWT: JWTConfig{
+			Secret: os.Getenv("JWT_SECRET"),
 		},
 	}
 }

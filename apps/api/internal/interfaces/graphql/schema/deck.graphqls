@@ -1,0 +1,19 @@
+type Deck {
+    id: ID!
+    ownerId: ID!
+    name: String!
+    createdAt: String!
+}
+
+input CreateDeckInput {
+    ownerId: ID!
+    name: String!
+}
+
+extend type Mutation {
+    createDeck(input: CreateDeckInput): Deck!
+}
+
+extend type Query {
+    decks(ownerId: ID!): [Deck!]!
+}

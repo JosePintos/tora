@@ -34,6 +34,7 @@ func (r *Repository) GetByUsername(ctx context.Context, username string) (*domai
 	if err != nil {
 		return nil, err
 	}
+
 	return toDomain(user), nil
 }
 

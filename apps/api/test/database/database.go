@@ -30,11 +30,12 @@ func New(t *testing.T) *pgxpool.Pool {
 	}
 
 	Migrate(t, cfg.Database.URL)
-	Cleanup(t, pool)
 
 	t.Cleanup(func() {
 		pool.Close()
 	})
+
+	Cleanup(t, pool)
 
 	return pool
 }

@@ -13,6 +13,11 @@ VALUES (
 )
 RETURNING *;
 
+-- name: GetDeckByID :one
+SELECT *
+FROM decks
+WHERE id = $1;
+
 -- name: ListDecksByOwner :many
 SELECT *
 FROM decks

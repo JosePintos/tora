@@ -8,7 +8,7 @@ import (
 
 // You want to verify the business invariants.
 func TestNewUser(t *testing.T) {
-	user := NewUser("testuser", "password123")
+	user, _ := NewUser("testuser", "password123")
 	if user.Username != "testuser" {
 		t.Fatal("expected username to be testuser")
 	}

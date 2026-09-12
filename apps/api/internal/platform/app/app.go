@@ -42,7 +42,7 @@ func New() *App {
 	}
 
 	app.Database = db
-	app.Container = bootstrap.New(db)
+	app.Container = bootstrap.New(db, cfg)
 
 	resolver := resolvers.New(app.Container)
 	app.Server = server.New(cfg, resolver)
