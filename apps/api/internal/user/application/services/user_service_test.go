@@ -400,3 +400,24 @@ func TestLogin_UserNotFound(t *testing.T) {
 		t.Fatal("expected token to be empty on error")
 	}
 }
+
+func TestLogin_RepositoryReturnsNilUser(t *testing.T) {
+	repo := &MockUserRepository{
+		GetByUsernameFn: func(ctx context.Context, username string) (*domain.User, error) {
+			return nil, nil
+		},
+	}
+
+	service := NewUserService(repo, &MockPasswordHasher{}, &MockTokenProvider{})
+
+	token, err := service.Login(context.Background(), commands.LoginCommand{
+		Username: "ghost",
+		Password: "password123",
+	})
+	if !errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("expected ErrUserNotFound, got %v", err)
+	}
+	if token != "" {
+		t.Fatal("expected token to be empty on error")
+	}
+}

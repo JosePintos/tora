@@ -35,6 +35,11 @@ func New() *App {
 		Logger: log,
 	}
 
+	if cfg.JWT.Secret == "" {
+		app.Logger.Error("JWT_SECRET must be set")
+		os.Exit(1)
+	}
+
 	db, err := app.initializeDatabase()
 	if err != nil {
 		app.Logger.Error("failed to initialize database", "error", err)

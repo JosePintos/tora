@@ -46,9 +46,13 @@ func newTestDeckService(repo ports.DeckRepository) *DeckService {
 	return NewDeckService(repo)
 }
 
-func TestCreateDeck(t *testing.T) {
+func TestCreateDeck_Success(t *testing.T) {
+	ownerID := uuid.New()
+	var savedDeck *domain.Deck
+
 	repo := &MockDeckRepository{
 		CreateFn: func(ctx context.Context, deck *domain.Deck) error {
+			savedDeck = deck
 			return nil
 		},
 	}
@@ -56,13 +60,13 @@ func TestCreateDeck(t *testing.T) {
 	service := newTestDeckService(repo)
 
 	deck, err := service.Create(context.Background(), commands.CreateDeckCommand{
-		OwnerID: uuid.New(),
+		OwnerID: ownerID,
 		Name:    "Test Deck",
 	})
+
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-
 	if deck == nil {
 		t.Fatalf("expected deck to be created, got nil")
 	}
@@ -74,6 +78,12 @@ func TestCreateDeck(t *testing.T) {
 	}
 	if repo.CreatedDeck == nil {
 		t.Fatal("expected repository to receive deck")
+	}
+	if savedDeck == nil {
+		t.Fatal("expected savedDeck to be set")
+	}
+	if savedDeck.OwnerID != ownerID {
+		t.Fatalf("expected savedDeck owner ID to be %v, got %v", ownerID, savedDeck.OwnerID)
 	}
 }
 

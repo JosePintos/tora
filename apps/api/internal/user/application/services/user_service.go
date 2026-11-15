@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/JosePintos/tora/apps/api/internal/user/application/commands"
@@ -60,7 +59,7 @@ func (s *UserService) GetByUsername(ctx context.Context, username string) (*doma
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("User found: %s\n for username: %s\n", user.Username, username)
+
 	if user == nil {
 		return nil, ErrUserNotFound
 	}
@@ -71,6 +70,9 @@ func (s *UserService) Login(ctx context.Context, cmd commands.LoginCommand) (str
 	user, err := s.userRepository.GetByUsername(ctx, cmd.Username)
 	if err != nil {
 		return "", err
+	}
+	if user == nil {
+		return "", ErrUserNotFound
 	}
 
 	if err := s.passwordHasher.Compare(user.PasswordHash, cmd.Password); err != nil {

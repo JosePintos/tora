@@ -7,24 +7,24 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/JosePintos/tora/apps/api/internal/deck/application/commands"
+	"github.com/JosePintos/tora/apps/api/internal/interfaces/graphql/auth"
 	"github.com/JosePintos/tora/apps/api/internal/interfaces/graphql/mapper"
 	"github.com/JosePintos/tora/apps/api/internal/interfaces/graphql/model"
-	"github.com/google/uuid"
 )
 
 // CreateDeck is the resolver for the createDeck field.
 func (r *mutationResolver) CreateDeck(ctx context.Context, input *model.CreateDeckInput) (*model.Deck, error) {
-	ownerID, err := uuid.Parse(input.OwnerID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid ownerID: %w", err)
+	userId, ok := auth.UserIDFromContext(ctx)
+	if !ok {
+		return nil, errors.New("unauthenticated")
 	}
 
 	cmd := commands.CreateDeckCommand{
 		Name:    input.Name,
-		OwnerID: ownerID,
+		OwnerID: userId,
 	}
 
 	deck, err := r.Container.DeckService.Create(ctx, cmd)
@@ -35,13 +35,13 @@ func (r *mutationResolver) CreateDeck(ctx context.Context, input *model.CreateDe
 }
 
 // Decks is the resolver for the decks field.
-func (r *queryResolver) Decks(ctx context.Context, ownerID string) ([]*model.Deck, error) {
-	parsedOwnerID, err := uuid.Parse(ownerID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid ownerID: %w", err)
+func (r *queryResolver) Decks(ctx context.Context) ([]*model.Deck, error) {
+	userID, ok := auth.UserIDFromContext(ctx)
+	if !ok {
+		return nil, errors.New("unauthenticated")
 	}
 
-	decks, err := r.Container.DeckService.ListByOwner(ctx, parsedOwnerID)
+	decks, err := r.Container.DeckService.ListByOwner(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
