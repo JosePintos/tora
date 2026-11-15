@@ -8,9 +8,10 @@ import (
 
 func toDomain(user sqlc.User) *domain.User {
 	return &domain.User{
-		ID:        user.ID.Bytes,
-		Username:  user.Username,
-		CreatedAt: user.CreatedAt.Time,
+		ID:           user.ID.Bytes,
+		Username:     user.Username,
+		PasswordHash: user.PasswordHash,
+		CreatedAt:    user.CreatedAt.Time,
 	}
 }
 

@@ -6,7 +6,6 @@ type Deck {
 }
 
 input CreateDeckInput {
-    ownerId: ID!
     name: String!
 }
 
@@ -15,5 +14,5 @@ extend type Mutation {
 }
 
 extend type Query {
-    decks(ownerId: ID!): [Deck!]!
+    decks: [Deck!]!
 }

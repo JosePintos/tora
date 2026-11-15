@@ -1,1 +1,1 @@
-DROP TABLE decks;
+DROP TABLE IF EXISTS decks;

@@ -2,11 +2,13 @@ package postgres
 
 import (
 	"context"
+	"errors"
 
 	"github.com/JosePintos/tora/apps/api/internal/platform/database/sqlc"
 	"github.com/JosePintos/tora/apps/api/internal/user/application/ports"
 	"github.com/JosePintos/tora/apps/api/internal/user/domain"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type Repository struct {
@@ -31,6 +33,9 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, e
 
 func (r *Repository) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
 	user, err := r.queries.GetUserByUsername(ctx, username)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}

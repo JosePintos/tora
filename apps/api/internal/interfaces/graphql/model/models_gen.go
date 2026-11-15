@@ -2,9 +2,12 @@
 
 package model
 
+type AuthPayload struct {
+	Token string `json:"token"`
+}
+
 type CreateDeckInput struct {
-	OwnerID string `json:"ownerId"`
-	Name    string `json:"name"`
+	Name string `json:"name"`
 }
 
 type Deck struct {
@@ -12,6 +15,11 @@ type Deck struct {
 	OwnerID   string `json:"ownerId"`
 	Name      string `json:"name"`
 	CreatedAt string `json:"createdAt"`
+}
+
+type LoginInput struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 type Mutation struct {
