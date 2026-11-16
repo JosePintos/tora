@@ -1,4 +1,4 @@
-package bootsrap
+package bootstrap
 
 import (
 	deckservices "github.com/JosePintos/tora/apps/api/internal/deck/application/services"
