@@ -15,7 +15,7 @@ import (
 )
 
 // Register is the resolver for the register field.
-func (r *mutationResolver) Register(ctx context.Context, input *model.RegisterInput) (*model.User, error) {
+func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInput) (*model.User, error) {
 	cmd := commands.CreateUserCommand{
 		Username: input.Username,
 		Password: input.Password,

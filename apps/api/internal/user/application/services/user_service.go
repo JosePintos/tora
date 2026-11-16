@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/JosePintos/tora/apps/api/internal/user/application/commands"
 	"github.com/JosePintos/tora/apps/api/internal/user/application/ports"
@@ -92,7 +93,7 @@ func validateUserCredentials(username string, password string) error {
 		return ErrEmptyUsername
 	}
 
-	if len(username) > 100 {
+	if utf8.RuneCountInString(username) > 100 {
 		return ErrUsernameTooLong
 	}
 	if len(password) < 8 {

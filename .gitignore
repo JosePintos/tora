@@ -2,3 +2,7 @@ node_modules
 tmp/
 .env
 coverage.out
+
+# Build outputs and downloaded tool binaries
+*.exe
+apps/api/migrate

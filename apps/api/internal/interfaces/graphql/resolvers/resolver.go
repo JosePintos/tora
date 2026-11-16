@@ -1,6 +1,6 @@
 package resolvers
 
-import bootstrap "github.com/JosePintos/tora/apps/api/internal/platform/bootstrap"
+import "github.com/JosePintos/tora/apps/api/internal/platform/bootstrap"
 
 // This file will not be regenerated automatically.
 //

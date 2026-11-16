@@ -10,7 +10,7 @@ input CreateDeckInput {
 }
 
 extend type Mutation {
-    createDeck(input: CreateDeckInput): Deck!
+    createDeck(input: CreateDeckInput!): Deck!
 }
 
 extend type Query {

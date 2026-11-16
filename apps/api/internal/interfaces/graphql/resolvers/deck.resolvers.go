@@ -16,7 +16,7 @@ import (
 )
 
 // CreateDeck is the resolver for the createDeck field.
-func (r *mutationResolver) CreateDeck(ctx context.Context, input *model.CreateDeckInput) (*model.Deck, error) {
+func (r *mutationResolver) CreateDeck(ctx context.Context, input model.CreateDeckInput) (*model.Deck, error) {
 	userId, ok := auth.UserIDFromContext(ctx)
 	if !ok {
 		return nil, errors.New("unauthenticated")
