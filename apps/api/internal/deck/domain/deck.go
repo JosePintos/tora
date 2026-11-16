@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
@@ -46,7 +47,8 @@ func validateDeckName(name string) error {
 		return ErrEmptyDeckName
 	}
 
-	if len(name) > 100 {
+	// Count characters, not bytes: a Japanese character is 3 bytes in UTF-8.
+	if utf8.RuneCountInString(name) > 100 {
 		return ErrDeckNameTooLong
 	}
 	return nil

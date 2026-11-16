@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -75,5 +76,18 @@ func TestRenameDeck_LongName(t *testing.T) {
 	longNameErr := deck.Rename(longName)
 	if !errors.Is(longNameErr, ErrDeckNameTooLong) {
 		t.Fatalf("expected ErrDeckNameTooLong, got %v", longNameErr)
+	}
+}
+
+func TestNewDeck_NameLengthCountsCharactersNotBytes(t *testing.T) {
+	// 100 kanji = 300 bytes in UTF-8, but only 100 characters.
+	name := strings.Repeat("漢", 100)
+
+	if _, err := NewDeck(uuid.New(), name); err != nil {
+		t.Fatalf("expected 100-character Japanese name to be valid, got %v", err)
+	}
+
+	if _, err := NewDeck(uuid.New(), name+"字"); !errors.Is(err, ErrDeckNameTooLong) {
+		t.Fatalf("expected ErrDeckNameTooLong for 101 characters, got %v", err)
 	}
 }

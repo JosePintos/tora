@@ -48,9 +48,9 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CreateDeck func(childComplexity int, input *model.CreateDeckInput) int
+		CreateDeck func(childComplexity int, input model.CreateDeckInput) int
 		Login      func(childComplexity int, input model.LoginInput) int
-		Register   func(childComplexity int, input *model.RegisterInput) int
+		Register   func(childComplexity int, input model.RegisterInput) int
 	}
 
 	Query struct {
@@ -70,9 +70,9 @@ type ComplexityRoot struct {
 // region    ************************** generated!.gotpl **************************
 
 type MutationResolver interface {
-	Register(ctx context.Context, input *model.RegisterInput) (*model.User, error)
+	Register(ctx context.Context, input model.RegisterInput) (*model.User, error)
 	Login(ctx context.Context, input model.LoginInput) (*model.AuthPayload, error)
-	CreateDeck(ctx context.Context, input *model.CreateDeckInput) (*model.Deck, error)
+	CreateDeck(ctx context.Context, input model.CreateDeckInput) (*model.Deck, error)
 }
 type QueryResolver interface {
 	Health(ctx context.Context) (string, error)
@@ -139,7 +139,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Mutation.CreateDeck(childComplexity, args["input"].(*model.CreateDeckInput)), true
+		return e.ComplexityRoot.Mutation.CreateDeck(childComplexity, args["input"].(model.CreateDeckInput)), true
 	case "Mutation.login":
 		if e.ComplexityRoot.Mutation.Login == nil {
 			break
@@ -161,7 +161,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Mutation.Register(childComplexity, args["input"].(*model.RegisterInput)), true
+		return e.ComplexityRoot.Mutation.Register(childComplexity, args["input"].(model.RegisterInput)), true
 
 	case "Query.decks":
 		if e.ComplexityRoot.Query.Decks == nil {
@@ -305,7 +305,7 @@ input CreateDeckInput {
 }
 
 extend type Mutation {
-    createDeck(input: CreateDeckInput): Deck!
+    createDeck(input: CreateDeckInput!): Deck!
 }
 
 extend type Query {
@@ -326,7 +326,7 @@ input RegisterInput  {
 }
 
 type Mutation {
-    register(input: RegisterInput ): User!
+    register(input: RegisterInput!): User!
 }
 `, BuiltIn: false},
 }
@@ -490,8 +490,8 @@ func (ec *executionContext) field_Mutation_createDeck_args(ctx context.Context, 
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
-		func(ctx context.Context, v any) (*model.CreateDeckInput, error) {
-			return ec.unmarshalOCreateDeckInput2ᚖgithubᚗcomᚋJosePintosᚋtoraᚋappsᚋapiᚋinternalᚋinterfacesᚋgraphqlᚋmodelᚐCreateDeckInput(ctx, v)
+		func(ctx context.Context, v any) (model.CreateDeckInput, error) {
+			return ec.unmarshalNCreateDeckInput2githubᚗcomᚋJosePintosᚋtoraᚋappsᚋapiᚋinternalᚋinterfacesᚋgraphqlᚋmodelᚐCreateDeckInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -518,8 +518,8 @@ func (ec *executionContext) field_Mutation_register_args(ctx context.Context, ra
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
-		func(ctx context.Context, v any) (*model.RegisterInput, error) {
-			return ec.unmarshalORegisterInput2ᚖgithubᚗcomᚋJosePintosᚋtoraᚋappsᚋapiᚋinternalᚋinterfacesᚋgraphqlᚋmodelᚐRegisterInput(ctx, v)
+		func(ctx context.Context, v any) (model.RegisterInput, error) {
+			return ec.unmarshalNRegisterInput2githubᚗcomᚋJosePintosᚋtoraᚋappsᚋapiᚋinternalᚋinterfacesᚋgraphqlᚋmodelᚐRegisterInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -727,7 +727,7 @@ func (ec *executionContext) _Mutation_register(ctx context.Context, field graphq
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().Register(ctx, fc.Args["input"].(*model.RegisterInput))
+			return ec.Resolvers.Mutation().Register(ctx, fc.Args["input"].(model.RegisterInput))
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *model.User) graphql.Marshaler {
@@ -815,7 +815,7 @@ func (ec *executionContext) _Mutation_createDeck(ctx context.Context, field grap
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().CreateDeck(ctx, fc.Args["input"].(*model.CreateDeckInput))
+			return ec.Resolvers.Mutation().CreateDeck(ctx, fc.Args["input"].(model.CreateDeckInput))
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *model.Deck) graphql.Marshaler {
@@ -2942,6 +2942,11 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
+func (ec *executionContext) unmarshalNCreateDeckInput2githubᚗcomᚋJosePintosᚋtoraᚋappsᚋapiᚋinternalᚋinterfacesᚋgraphqlᚋmodelᚐCreateDeckInput(ctx context.Context, v any) (model.CreateDeckInput, error) {
+	res, err := ec.unmarshalInputCreateDeckInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNDeck2githubᚗcomᚋJosePintosᚋtoraᚋappsᚋapiᚋinternalᚋinterfacesᚋgraphqlᚋmodelᚐDeck(ctx context.Context, sel ast.SelectionSet, v model.Deck) graphql.Marshaler {
 	return ec._Deck(ctx, sel, &v)
 }
@@ -2990,6 +2995,11 @@ func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.Selec
 
 func (ec *executionContext) unmarshalNLoginInput2githubᚗcomᚋJosePintosᚋtoraᚋappsᚋapiᚋinternalᚋinterfacesᚋgraphqlᚋmodelᚐLoginInput(ctx context.Context, v any) (model.LoginInput, error) {
 	res, err := ec.unmarshalInputLoginInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNRegisterInput2githubᚗcomᚋJosePintosᚋtoraᚋappsᚋapiᚋinternalᚋinterfacesᚋgraphqlᚋmodelᚐRegisterInput(ctx context.Context, v any) (model.RegisterInput, error) {
+	res, err := ec.unmarshalInputRegisterInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -3192,22 +3202,6 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	_ = ctx
 	res := graphql.MarshalBoolean(*v)
 	return res
-}
-
-func (ec *executionContext) unmarshalOCreateDeckInput2ᚖgithubᚗcomᚋJosePintosᚋtoraᚋappsᚋapiᚋinternalᚋinterfacesᚋgraphqlᚋmodelᚐCreateDeckInput(ctx context.Context, v any) (*model.CreateDeckInput, error) {
-	if v == nil {
-		return nil, nil
-	}
-	res, err := ec.unmarshalInputCreateDeckInput(ctx, v)
-	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) unmarshalORegisterInput2ᚖgithubᚗcomᚋJosePintosᚋtoraᚋappsᚋapiᚋinternalᚋinterfacesᚋgraphqlᚋmodelᚐRegisterInput(ctx context.Context, v any) (*model.RegisterInput, error) {
-	if v == nil {
-		return nil, nil
-	}
-	res, err := ec.unmarshalInputRegisterInput(ctx, v)
-	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v any) (*string, error) {

@@ -8,7 +8,7 @@ import (
 	"github.com/JosePintos/tora/apps/api/internal/deck/domain"
 	"github.com/JosePintos/tora/apps/api/internal/interfaces/graphql/auth"
 	"github.com/JosePintos/tora/apps/api/internal/interfaces/graphql/model"
-	bootstrap "github.com/JosePintos/tora/apps/api/internal/platform/bootstrap"
+	"github.com/JosePintos/tora/apps/api/internal/platform/bootstrap"
 	"github.com/google/uuid"
 )
 
@@ -78,7 +78,7 @@ func TestCreateDeck_Authenticated(t *testing.T) {
 
 	ctx := auth.WithUserID(context.Background(), userID)
 
-	input := &model.CreateDeckInput{
+	input := model.CreateDeckInput{
 		Name: "JLPT N5",
 	}
 
@@ -125,7 +125,7 @@ func TestCreateDeck_Unauthenticated(t *testing.T) {
 
 	ctx := context.Background() // No user ID in context
 
-	input := &model.CreateDeckInput{
+	input := model.CreateDeckInput{
 		Name: "JLPT N5",
 	}
 

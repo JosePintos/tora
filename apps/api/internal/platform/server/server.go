@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/JosePintos/tora/apps/api/internal/interfaces/graphql/resolvers"
 	"github.com/JosePintos/tora/apps/api/internal/platform/config"
@@ -16,8 +17,9 @@ type Server struct {
 func New(cfg *config.Config, resolver *resolvers.Resolver) *Server {
 	router := NewRouter(resolver)
 	server := &http.Server{
-		Addr:    ":" + cfg.Server.Port,
-		Handler: router,
+		Addr:              ":" + cfg.Server.Port,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second, // guards against Slowloris (slow-header) attacks
 	}
 	return &Server{
 		Config: cfg,

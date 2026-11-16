@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/JosePintos/tora/apps/api/internal/interfaces/graphql/resolvers"
-	bootstrap "github.com/JosePintos/tora/apps/api/internal/platform/bootstrap"
+	"github.com/JosePintos/tora/apps/api/internal/platform/bootstrap"
 	"github.com/JosePintos/tora/apps/api/internal/platform/config"
 	"github.com/JosePintos/tora/apps/api/internal/platform/database"
 	"github.com/JosePintos/tora/apps/api/internal/platform/logger"
@@ -84,11 +84,5 @@ func (a *App) Run() {
 }
 
 func (a *App) initializeDatabase() (*pgxpool.Pool, error) {
-	db, err := database.New(a.Config)
-	if err != nil {
-		a.Logger.Error("failed to connect to database", "error", err)
-		os.Exit(1)
-	}
-
-	return db, nil
+	return database.New(a.Config)
 }
