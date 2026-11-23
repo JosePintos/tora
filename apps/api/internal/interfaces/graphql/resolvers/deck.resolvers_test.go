@@ -2,6 +2,7 @@ package resolvers
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	deckservices "github.com/JosePintos/tora/apps/api/internal/deck/application/services"
@@ -135,8 +136,8 @@ func TestCreateDeck_Unauthenticated(t *testing.T) {
 		t.Fatal("expected unauthenticated error, got nil")
 	}
 
-	if err.Error() != "unauthenticated" {
-		t.Fatalf("expected unauthenticated error, got %q", err.Error())
+	if !errors.Is(err, auth.ErrUnauthenticated) {
+		t.Fatalf("expected ErrUnauthenticated, got %v", err)
 	}
 
 	if result != nil {

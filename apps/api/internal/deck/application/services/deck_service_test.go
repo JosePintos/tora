@@ -99,8 +99,8 @@ func TestCreateDeck_EmptyName(t *testing.T) {
 		OwnerID: uuid.New(),
 		Name:    "",
 	})
-	if err == nil {
-		t.Fatalf("expected error for empty deck name, got nil")
+	if !errors.Is(err, domain.ErrEmptyDeckName) {
+		t.Fatalf("expected ErrEmptyDeckName, got %v", err)
 	}
 	if repo.CreateCalls != 0 {
 		t.Fatalf("expected repository not to be called, got %d calls", repo.CreateCalls)

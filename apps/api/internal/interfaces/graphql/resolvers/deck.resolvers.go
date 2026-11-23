@@ -7,7 +7,6 @@ package resolvers
 
 import (
 	"context"
-	"errors"
 
 	"github.com/JosePintos/tora/apps/api/internal/deck/application/commands"
 	"github.com/JosePintos/tora/apps/api/internal/interfaces/graphql/auth"
@@ -19,7 +18,7 @@ import (
 func (r *mutationResolver) CreateDeck(ctx context.Context, input model.CreateDeckInput) (*model.Deck, error) {
 	userId, ok := auth.UserIDFromContext(ctx)
 	if !ok {
-		return nil, errors.New("unauthenticated")
+		return nil, auth.ErrUnauthenticated
 	}
 
 	cmd := commands.CreateDeckCommand{
@@ -38,7 +37,7 @@ func (r *mutationResolver) CreateDeck(ctx context.Context, input model.CreateDec
 func (r *queryResolver) Decks(ctx context.Context) ([]*model.Deck, error) {
 	userID, ok := auth.UserIDFromContext(ctx)
 	if !ok {
-		return nil, errors.New("unauthenticated")
+		return nil, auth.ErrUnauthenticated
 	}
 
 	decks, err := r.Container.DeckService.ListByOwner(ctx, userID)

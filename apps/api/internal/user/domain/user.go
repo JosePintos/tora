@@ -1,11 +1,17 @@
 package domain
 
 import (
-	"errors"
 	"strings"
 	"time"
 
+	"github.com/JosePintos/tora/apps/api/internal/apperror"
 	"github.com/google/uuid"
+)
+
+var (
+	ErrEmptyUsername = apperror.New(apperror.Invalid, "username cannot be empty")
+	// ErrUsernameTaken is returned by repositories when the unique username rule is broken.
+	ErrUsernameTaken = apperror.New(apperror.Conflict, "username is already taken")
 )
 
 // No json tags porque no es una API model
@@ -28,7 +34,7 @@ func (u User) IsRegistered() bool {
 func NewUser(username, passwordHash string) (*User, error) {
 
 	if strings.TrimSpace(username) == "" {
-		return nil, errors.New("username cannot be empty")
+		return nil, ErrEmptyUsername
 	}
 
 	return &User{

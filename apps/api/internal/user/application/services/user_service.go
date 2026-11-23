@@ -2,21 +2,21 @@ package services
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/JosePintos/tora/apps/api/internal/apperror"
 	"github.com/JosePintos/tora/apps/api/internal/user/application/commands"
 	"github.com/JosePintos/tora/apps/api/internal/user/application/ports"
 	"github.com/JosePintos/tora/apps/api/internal/user/domain"
 )
 
 var (
-	ErrUserPasswordTooShort = errors.New("user password is too short")
-	ErrEmptyUsername        = errors.New("username cannot be empty")
-	ErrUsernameTooLong      = errors.New("username cannot exceed 100 characters")
-	ErrUserNotFound         = errors.New("user not found")
-	ErrInvalidPassword      = errors.New("invalid password")
+	ErrUserPasswordTooShort = apperror.New(apperror.Invalid, "user password is too short")
+	ErrEmptyUsername        = domain.ErrEmptyUsername // alias: the domain owns this rule
+	ErrUsernameTooLong      = apperror.New(apperror.Invalid, "username cannot exceed 100 characters")
+	ErrUserNotFound         = apperror.New(apperror.NotFound, "user not found")
+	ErrInvalidPassword      = apperror.New(apperror.Unauthenticated, "invalid password")
 )
 
 type UserService struct {

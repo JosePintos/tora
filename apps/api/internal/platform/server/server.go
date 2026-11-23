@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -14,8 +15,8 @@ type Server struct {
 	Server *http.Server
 }
 
-func New(cfg *config.Config, resolver *resolvers.Resolver) *Server {
-	router := NewRouter(resolver)
+func New(cfg *config.Config, resolver *resolvers.Resolver, logger *slog.Logger) *Server {
+	router := NewRouter(resolver, logger)
 	server := &http.Server{
 		Addr:              ":" + cfg.Server.Port,
 		Handler:           router,

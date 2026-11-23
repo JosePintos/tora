@@ -9,6 +9,7 @@ import (
 	"github.com/JosePintos/tora/apps/api/internal/user/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type Repository struct {
@@ -21,8 +22,21 @@ func New(queries *sqlc.Queries) *Repository {
 	}
 }
 
+// Postgres error details this adapter translates into domain errors.
+const (
+	pgUniqueViolation      = "23505"
+	usersUsernameUniqueKey = "users_username_key" // default name for users.username UNIQUE
+)
+
 func (r *Repository) Create(ctx context.Context, user *domain.User) error {
 	_, err := r.queries.CreateUser(ctx, toDB(user))
+
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) &&
+		pgErr.Code == pgUniqueViolation &&
+		pgErr.ConstraintName == usersUsernameUniqueKey {
+		return domain.ErrUsernameTaken
+	}
 
 	return err
 }
