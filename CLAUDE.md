@@ -233,6 +233,8 @@ if !ok {
 
 Do not assume the middleware enforces authorization.
 
+`Login` must not reveal whether a username exists. It returns the single `ErrInvalidCredentials` for both an unknown username and a wrong password. For an unknown username it still compares the password against a dummy hash, so both paths take the same time. Keep both properties when changing login.
+
 Ownership must come from the authenticated context, never from client-supplied ownership fields. For example, deck creation obtains `OwnerID` from the authenticated user rather than accepting it in `CreateDeckInput`.
 
 ## Database and migrations
@@ -402,7 +404,7 @@ The application service, PostgreSQL repository adapter, and GraphQL operations a
 
 These are acknowledged, not yet addressed. Don't fix them as a side effect of an unrelated task, but mention one when it is relevant to the work at hand. Remove an entry once it is resolved.
 
-- Login reveals whether a username exists: an unknown user gets `NOT_FOUND` "user not found" while a wrong password gets `UNAUTHENTICATED` "invalid password", and bcrypt only runs for existing users, so timing differs too.
+- There is no rate limiting or lockout on `login`, so passwords can be brute-forced. `register` also reveals whether a username exists through `CONFLICT`. That's a common trade-off for usernames, but it means enumeration protection on `login` alone isn't complete.
 - The server uses the deprecated `handler.NewDefaultServer`, with no query complexity or depth limit and introspection always on.
 - `decks.owner_id` has no index, although `ListDecksByOwner` filters on it.
 - Validation is split: username length and password rules live in `UserService` instead of the user domain (the empty-username rule is already shared through `domain.ErrEmptyUsername`).
