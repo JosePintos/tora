@@ -47,7 +47,8 @@ func (m *mockDeckRepository) Update(context.Context, *deckdomain.Deck) error { r
 func (m *mockDeckRepository) Delete(context.Context, uuid.UUID) error { return nil }
 
 type mockUserRepository struct {
-	CreateFn func(ctx context.Context, user *userdomain.User) error
+	CreateFn        func(ctx context.Context, user *userdomain.User) error
+	GetByUsernameFn func(ctx context.Context, username string) (*userdomain.User, error)
 }
 
 func (m *mockUserRepository) Create(ctx context.Context, user *userdomain.User) error {
@@ -61,15 +62,24 @@ func (m *mockUserRepository) GetByID(context.Context, uuid.UUID) (*userdomain.Us
 	return nil, nil
 }
 
-func (m *mockUserRepository) GetByUsername(context.Context, string) (*userdomain.User, error) {
+func (m *mockUserRepository) GetByUsername(ctx context.Context, username string) (*userdomain.User, error) {
+	if m.GetByUsernameFn != nil {
+		return m.GetByUsernameFn(ctx, username)
+	}
 	return nil, nil
 }
 
+// mockPasswordHasher accepts only the password "correct".
 type mockPasswordHasher struct{}
 
 func (mockPasswordHasher) Hash(password string) (string, error) { return "hash", nil }
 
-func (mockPasswordHasher) Compare(hash, password string) error { return nil }
+func (mockPasswordHasher) Compare(hash, password string) error {
+	if password != "correct" {
+		return errors.New("mismatch")
+	}
+	return nil
+}
 
 // mockTokenProvider accepts the token "valid" for userID.
 type mockTokenProvider struct{ userID uuid.UUID }
@@ -186,6 +196,21 @@ func TestRouter_ErrorResponses(t *testing.T) {
 			wantCode:    "INTERNAL_SERVER_ERROR",
 			wantMessage: "internal server error",
 			wantLogged:  "nil map write",
+		},
+		{
+			name:        "login with unknown username",
+			query:       `mutation { login(input: { username: "nobody", password: "wrong" }) { token } }`,
+			wantCode:    "UNAUTHENTICATED",
+			wantMessage: "invalid username or password",
+		},
+		{
+			name:  "login with wrong password looks identical",
+			query: `mutation { login(input: { username: "alice", password: "wrong" }) { token } }`,
+			userRepo: &mockUserRepository{GetByUsernameFn: func(context.Context, string) (*userdomain.User, error) {
+				return &userdomain.User{ID: uuid.New(), Username: "alice", PasswordHash: "hash"}, nil
+			}},
+			wantCode:    "UNAUTHENTICATED",
+			wantMessage: "invalid username or password",
 		},
 		{
 			name:        "gqlgen validation errors keep their own code",

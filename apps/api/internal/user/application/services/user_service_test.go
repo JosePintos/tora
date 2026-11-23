@@ -303,7 +303,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 
 	hasher := &MockPasswordHasher{
 		CompareFn: func(hash, password string) error {
-			return ErrInvalidPassword
+			return errors.New("bcrypt: hashedPassword is not the hash of the given password")
 		},
 	}
 
@@ -322,8 +322,8 @@ func TestLogin_WrongPassword(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
-	if !errors.Is(err, ErrInvalidPassword) {
-		t.Fatalf("expected ErrInvalidPassword, got %v", err)
+	if !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials, got %v", err)
 	}
 }
 
@@ -365,59 +365,112 @@ func TestLogin_FailGenerateToken(t *testing.T) {
 	}
 }
 
-func TestLogin_UserNotFound(t *testing.T) {
+func TestLogin_UnknownUsername(t *testing.T) {
 	repo := &MockUserRepository{
 		GetByUsernameFn: func(ctx context.Context, username string) (*domain.User, error) {
-			return nil, ErrUserNotFound
+			return nil, nil // repositories return (nil, nil) when no row matches
 		},
 	}
 
+	var comparedHashes []string
 	hasher := &MockPasswordHasher{
+		HashFn: func(password string) (string, error) {
+			return "dummy-hash", nil
+		},
 		CompareFn: func(hash, password string) error {
-			return nil
+			comparedHashes = append(comparedHashes, hash)
+			return errors.New("mismatch")
 		},
 	}
 
 	tokenProvider := &MockTokenProvider{
 		GenerateTokenFn: func(userID uuid.UUID) (string, error) {
-			return "token", nil
+			t.Fatal("no token must be generated for an unknown user")
+			return "", nil
 		},
 	}
 
 	service := NewUserService(repo, hasher, tokenProvider)
 
 	token, err := service.Login(context.Background(), commands.LoginCommand{
-		Username: "nonexistentusername",
+		Username: "ghost",
 		Password: "password123",
 	})
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if !errors.Is(err, ErrUserNotFound) {
-		t.Fatalf("expected ErrUserNotFound, got %v", err)
+	if !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials, got %v", err)
 	}
 	if token != "" {
 		t.Fatal("expected token to be empty on error")
 	}
+	if len(comparedHashes) != 1 || comparedHashes[0] != "dummy-hash" {
+		t.Fatalf("expected one comparison against the dummy hash (timing equalization), got %v", comparedHashes)
+	}
 }
 
-func TestLogin_RepositoryReturnsNilUser(t *testing.T) {
+func TestLogin_UnknownUserAndWrongPasswordAreIndistinguishable(t *testing.T) {
+	existing := &domain.User{ID: uuid.New(), Username: "alice", PasswordHash: "real-hash"}
+
+	repo := &MockUserRepository{
+		GetByUsernameFn: func(ctx context.Context, username string) (*domain.User, error) {
+			if username == "alice" {
+				return existing, nil
+			}
+			return nil, nil
+		},
+	}
+	hasher := &MockPasswordHasher{
+		CompareFn: func(hash, password string) error { return errors.New("mismatch") },
+	}
+
+	service := NewUserService(repo, hasher, &MockTokenProvider{})
+
+	_, unknownErr := service.Login(context.Background(), commands.LoginCommand{Username: "nobody", Password: "x"})
+	_, wrongPasswordErr := service.Login(context.Background(), commands.LoginCommand{Username: "alice", Password: "x"})
+
+	if unknownErr != wrongPasswordErr {
+		t.Fatalf("expected the exact same error, got %q and %q", unknownErr, wrongPasswordErr)
+	}
+}
+
+func TestLogin_DummyHashIsComputedOnce(t *testing.T) {
 	repo := &MockUserRepository{
 		GetByUsernameFn: func(ctx context.Context, username string) (*domain.User, error) {
 			return nil, nil
 		},
 	}
 
+	hashCalls := 0
+	hasher := &MockPasswordHasher{
+		HashFn: func(password string) (string, error) {
+			hashCalls++
+			return "dummy-hash", nil
+		},
+		CompareFn: func(hash, password string) error { return errors.New("mismatch") },
+	}
+
+	service := NewUserService(repo, hasher, &MockTokenProvider{})
+
+	for range 3 {
+		_, _ = service.Login(context.Background(), commands.LoginCommand{Username: "ghost", Password: "x"})
+	}
+
+	if hashCalls != 1 {
+		t.Fatalf("expected the dummy hash to be created once, got %d Hash calls", hashCalls)
+	}
+}
+
+func TestLogin_RepositoryFailureIsNotReportedAsBadCredentials(t *testing.T) {
+	errDatabase := errors.New("connection refused")
+	repo := &MockUserRepository{
+		GetByUsernameFn: func(ctx context.Context, username string) (*domain.User, error) {
+			return nil, errDatabase
+		},
+	}
+
 	service := NewUserService(repo, &MockPasswordHasher{}, &MockTokenProvider{})
 
-	token, err := service.Login(context.Background(), commands.LoginCommand{
-		Username: "ghost",
-		Password: "password123",
-	})
-	if !errors.Is(err, ErrUserNotFound) {
-		t.Fatalf("expected ErrUserNotFound, got %v", err)
-	}
-	if token != "" {
-		t.Fatal("expected token to be empty on error")
+	_, err := service.Login(context.Background(), commands.LoginCommand{Username: "alice", Password: "x"})
+	if !errors.Is(err, errDatabase) {
+		t.Fatalf("expected the database error to pass through, got %v", err)
 	}
 }
