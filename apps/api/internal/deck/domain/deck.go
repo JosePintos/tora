@@ -1,17 +1,17 @@
 package domain
 
 import (
-	"errors"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	"github.com/JosePintos/tora/apps/api/internal/apperror"
 	"github.com/google/uuid"
 )
 
 var (
-	ErrEmptyDeckName   = errors.New("deck name cannot be empty")
-	ErrDeckNameTooLong = errors.New("deck name cannot exceed 100 characters")
+	ErrEmptyDeckName   = apperror.New(apperror.Invalid, "deck name cannot be empty")
+	ErrDeckNameTooLong = apperror.New(apperror.Invalid, "deck name cannot exceed 100 characters")
 )
 
 type Deck struct {

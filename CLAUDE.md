@@ -165,6 +165,20 @@ Preserve this convention unless there is an explicit decision to change it. Be c
 
 Prefer wrapped errors using `%w` and `errors.Is` when callers need to identify specific errors.
 
+Repositories translate driver errors that have a business meaning into domain errors, so services never see Postgres error codes. For example, the user repository maps a unique violation on `users_username_key` to `domain.ErrUsernameTaken`.
+
+## Error handling
+
+Errors are classified by kind (see `docs/adrs/error-kinds.md`):
+
+- `internal/apperror` is a tiny shared kernel. It defines `Kind` (`Invalid`, `NotFound`, `Conflict`, `Unauthenticated`, `Forbidden`, `Internal`), `apperror.New(kind, message)` and `apperror.KindOf(err)`. It must not import anything else in this module.
+- Domain and application errors that a client can act on are sentinels created with `apperror.New`, for example `var ErrEmptyDeckName = apperror.New(apperror.Invalid, "...")`. Their message is shown to clients, so it must not contain internal details.
+- Anything not created with `apperror.New`, such as `errors.New` or driver errors, is `Internal`: it is logged and hidden from clients. When you add a new user-facing error, give it a kind, or clients will just see "internal server error".
+- Wrap with `%w`, never `%v`, or the kind and `errors.Is` stop working.
+- `internal/interfaces/graphql/errorpresenter` is the only place that maps kinds to GraphQL `extensions.code` (`BAD_USER_INPUT`, `NOT_FOUND`, `CONFLICT`, `UNAUTHENTICATED`, `FORBIDDEN`, `INTERNAL_SERVER_ERROR`). It logs internal errors once and recovers panics. Don't log errors in other layers as well.
+- Treat the codes as API contract: clients branch on them, so don't rename them.
+- In tests, assert errors with `errors.Is`, not by comparing messages.
+
 ## Wiring and request flow
 
 1. `cmd/server/main.go` loads `.env` using godotenv and calls `platform/app.New()`.
@@ -173,7 +187,7 @@ Prefer wrapped errors using `%w` and `errors.Is` when callers need to identify s
 4. `interfaces/graphql/resolvers.Resolver` holds the container.
 5. Resolvers convert GraphQL inputs into application commands, invoke services, and map results into GraphQL models.
 6. Domain-to-GraphQL conversion lives in `interfaces/graphql/mapper`.
-7. `platform/server/router.go` mounts `/query`, wrapped in `interfaces/graphql/auth.AuthMiddleware`.
+7. `platform/server/router.go` mounts `/query`, wrapped in `interfaces/graphql/auth.AuthMiddleware`, and installs the error presenter and recover function from `interfaces/graphql/errorpresenter`. The logger is passed in from `platform/app`.
 
 Keep resolvers thin. They should handle delivery concerns, not implement business rules.
 
@@ -187,6 +201,7 @@ GraphQL is centralized under `internal/interfaces/graphql/`.
 - `generated/` contains gqlgen execution code.
 - `mapper/` contains conversions between domain objects and GraphQL models.
 - `auth/` contains authentication middleware and context helpers.
+- `errorpresenter/` maps application errors to GraphQL errors.
 
 Do not expose domain entities or sqlc-generated database models directly through GraphQL.
 
@@ -212,7 +227,7 @@ Protected resolvers must explicitly call:
 ```go
 userID, ok := auth.UserIDFromContext(ctx)
 if !ok {
-    return nil, errors.New("unauthenticated")
+    return nil, auth.ErrUnauthenticated
 }
 ```
 
@@ -381,17 +396,17 @@ The `card` context currently has:
 - Migration `000004`.
 - sqlc queries.
 
-The application service, PostgreSQL repository adapter, and GraphQL operations are not yet implemented. Verify the actual code before assuming this status is still current, and update this section as the feature progresses.
+The application service, PostgreSQL repository adapter, and GraphQL operations are not yet implemented. The card domain errors still use `errors.New` and must be given a kind (`apperror.Invalid`) before they are exposed through GraphQL. Verify the actual code before assuming this status is still current, and update this section as the feature progresses.
 
 ### Known gaps
 
 These are acknowledged, not yet addressed. Don't fix them as a side effect of an unrelated task, but mention one when it is relevant to the work at hand. Remove an entry once it is resolved.
 
-- Errors reach GraphQL clients as raw strings: there is no error presenter or `extensions.code`, and database errors such as a duplicate username leak through.
-- Login reveals whether a username exists, both through different error messages and through timing (bcrypt only runs for existing users).
+- Login reveals whether a username exists: an unknown user gets `NOT_FOUND` "user not found" while a wrong password gets `UNAUTHENTICATED` "invalid password", and bcrypt only runs for existing users, so timing differs too.
 - The server uses the deprecated `handler.NewDefaultServer`, with no query complexity or depth limit and introspection always on.
 - `decks.owner_id` has no index, although `ListDecksByOwner` filters on it.
-- Validation is split: username and password rules live in `UserService`, and `DeckService` repeats the domain's empty-name check.
+- Validation is split: username length and password rules live in `UserService` instead of the user domain (the empty-username rule is already shared through `domain.ErrEmptyUsername`).
+- Errors from gqlgen's own argument unmarshalling (for example a malformed custom scalar) arrive at the presenter unclassified and are reported as `INTERNAL_SERVER_ERROR`. This doesn't matter while every input is a `String`, but it will once custom scalars are added.
 - `DeckRepository` declares `Update` and `Delete`, whose Postgres adapter panics with "not implemented".
 - The card port takes `deckID *uuid.UUID`, while everything else uses `uuid.UUID`.
 - The domain calls `time.Now()` directly, so timestamps can't be controlled in tests.

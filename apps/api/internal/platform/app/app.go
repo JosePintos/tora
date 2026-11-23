@@ -50,7 +50,7 @@ func New() *App {
 	app.Container = bootstrap.New(db, cfg)
 
 	resolver := resolvers.New(app.Container)
-	app.Server = server.New(cfg, resolver)
+	app.Server = server.New(cfg, resolver, log)
 
 	return app
 }

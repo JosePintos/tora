@@ -2,8 +2,6 @@ package services
 
 import (
 	"context"
-	"errors"
-	"strings"
 
 	"github.com/JosePintos/tora/apps/api/internal/deck/application/commands"
 	"github.com/JosePintos/tora/apps/api/internal/deck/application/ports"
@@ -22,10 +20,6 @@ func NewDeckService(deckRepository ports.DeckRepository) *DeckService {
 }
 
 func (s *DeckService) Create(ctx context.Context, cmd commands.CreateDeckCommand) (*domain.Deck, error) {
-	if strings.TrimSpace(cmd.Name) == "" {
-		return nil, errors.New("deckname cannot be empty")
-	}
-
 	deck, err := domain.NewDeck(cmd.OwnerID, cmd.Name)
 	if err != nil {
 		return nil, err

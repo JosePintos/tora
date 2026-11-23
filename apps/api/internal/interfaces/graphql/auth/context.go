@@ -3,8 +3,12 @@ package auth
 import (
 	"context"
 
+	"github.com/JosePintos/tora/apps/api/internal/apperror"
 	"github.com/google/uuid"
 )
+
+// ErrUnauthenticated is returned by resolvers that require a logged-in user.
+var ErrUnauthenticated = apperror.New(apperror.Unauthenticated, "unauthenticated")
 
 type contextKey string
 
