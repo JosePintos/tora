@@ -15,7 +15,7 @@ Go backend for Tora: a modular monolith that exposes a single GraphQL endpoint. 
 
 ## Getting started
 
-Prerequisites: Go (see `go.mod`), Docker, and the CLIs `sqlc`, `gqlgen`, `migrate` and `air` installed with `go install`.
+Prerequisites: Go (see `go.mod`), Docker, and the CLIs `sqlc`, `migrate` and `air` installed with `go install`. gqlgen needs no install: it is pinned in `go.mod` and runs with `go tool gqlgen`.
 
 1. Start the databases (from the repo root):
 
@@ -68,5 +68,5 @@ CI (`.github/workflows/api.yml`) runs lint, unit and integration tests, and `gov
 
 ```bash
 sqlc generate     # after changing migrations/ or sql/queries/
-gqlgen generate   # after changing internal/interfaces/graphql/schema/
+go tool gqlgen generate   # after changing internal/interfaces/graphql/schema/ (version pinned in go.mod)
 ```
