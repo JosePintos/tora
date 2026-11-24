@@ -93,6 +93,47 @@ jobs:
       - name: Integration tests
         run: go test -race -count=1 -p 1 $(go list ./... | grep /persistence/postgres)
 
+  # Fails when committed files don't match what the tools would produce:
+  # go.mod/go.sum not tidy, or sqlc/gqlgen output not regenerated after a change
+  # to migrations, SQL queries or GraphQL schemas.
+  codegen:
+    name: Codegen drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: apps/api/go.mod
+          cache-dependency-path: apps/api/go.sum
+
+      # Prebuilt binary: building sqlc from source needs cgo and takes minutes.
+      # Keep this version in sync with the "sqlc vX" header in the generated files.
+      - uses: sqlc-dev/setup-sqlc@bac53b7fb28c039a6c7f5736fd1e89744021bdd6 # v5.0.0
+        with:
+          sqlc-version: "1.31.1"
+
+      - name: go.mod and go.sum are tidy
+        run: go mod tidy -diff
+
+      - name: Regenerate code
+        run: |
+          sqlc generate
+          go tool gqlgen generate
+
+      # --porcelain also catches new untracked files, which git diff would miss.
+      - name: Generated code is up to date
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::Generated code is out of date. Run 'sqlc generate' and 'go tool gqlgen generate' in apps/api, then commit the result."
+            git status --porcelain
+            git diff
+            exit 1
+          fi
+
   vulncheck:
     name: Vulnerability check
     runs-on: ubuntu-latest

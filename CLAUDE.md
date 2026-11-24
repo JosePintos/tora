@@ -256,7 +256,7 @@ The server does not apply migrations at startup. Apply them explicitly before ru
 
 Run API commands from `apps/api`.
 
-Development tools (`sqlc`, `gqlgen`, `migrate`, `air`) are installed globally in `~/go/bin`; they are not tracked in `go.mod` as Go tools.
+gqlgen is pinned in `go.mod` with a `tool` directive, so run it as `go tool gqlgen`. That guarantees the generator matches the gqlgen runtime library. `sqlc`, `migrate` and `air` are installed globally in `~/go/bin`. sqlc isn't a Go tool dependency because it needs cgo, which isn't available on Windows. Use the version in the `sqlc vX` header of the generated files, which is also pinned in CI.
 
 ```bash
 go build ./...
@@ -276,7 +276,7 @@ go test ./internal/user/application/services -run TestLogin_WrongPassword
 sqlc generate
 
 # Generate gqlgen code after editing GraphQL schemas
-gqlgen generate
+go tool gqlgen generate
 
 # Lint and check for known vulnerabilities (same versions as CI)
 golangci-lint run ./...
@@ -344,7 +344,7 @@ Never hand-edit generated files. Modify their source files and regenerate.
 | Source | Command | Generated output |
 |---|---|---|
 | `migrations/*.sql` and `sql/queries/*.sql` | `sqlc generate` | `internal/platform/database/sqlc/` |
-| `internal/interfaces/graphql/schema/*.graphqls` | `gqlgen generate` | `graphql/generated/generated.go` and `graphql/model/models_gen.go` |
+| `internal/interfaces/graphql/schema/*.graphqls` | `go tool gqlgen generate` | `graphql/generated/generated.go` and `graphql/model/models_gen.go` |
 
 gqlgen uses the follow-schema resolver layout: `foo.graphqls` maps to `resolvers/foo.resolvers.go`.
 
@@ -434,12 +434,15 @@ These are acknowledged, not yet addressed. Don't fix them as a side effect of an
 
 - **Lint:** golangci-lint v2 with `apps/api/.golangci.yml`, which includes `go vet`, `errorlint` and `gosec`.
 - **Test:** build, unit tests with `-race`, then the repository integration tests against a `postgres:17` service on port 5433. Integration tests run with `-p 1` because the packages share one database that each one truncates.
+- **Codegen drift:** fails if `go mod tidy -diff` reports changes, or if `sqlc generate` plus `go tool gqlgen generate` changes or adds any file. After editing migrations, queries, schemas or dependencies, regenerate, tidy and commit the result.
 - **Vulnerability check:** `govulncheck`. It fails only on vulnerabilities the code can actually reach.
+
+Dependabot (`.github/dependabot.yml`) opens one grouped pull request per week for Go modules and one for GitHub Actions. New releases wait 5 days first (`cooldown`); security updates don't wait. Dependabot doesn't update versions written as plain text in the workflow (golangci-lint, govulncheck, sqlc), and it doesn't raise the `go` line in `go.mod`; update those by hand.
 
 Conventions:
 
 - Pin third-party actions to a full commit SHA with the tag in a comment, and keep `permissions: contents: read` unless a job needs more.
-- Keep the golangci-lint and govulncheck versions pinned in the workflow; update them on purpose, not implicitly.
+- Keep the golangci-lint, govulncheck and sqlc versions pinned in the workflow; update them on purpose, not implicitly.
 - Fix lint findings rather than silencing them. A `//nolint:<linter>` needs a reason in the comment.
 - The `go` line in `go.mod` sets the Go version CI uses, so raise it when a Go security release ships. `govulncheck` reports when that's needed.
 

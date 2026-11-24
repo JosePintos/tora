@@ -1,0 +1,35 @@
+# Dependabot opens pull requests that keep dependencies current.
+# Docs: https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference
+version: 2
+
+updates:
+  # Go modules of the API, including the gqlgen tool directive in go.mod.
+  - package-ecosystem: gomod
+    directory: /apps/api
+    schedule:
+      interval: weekly
+    # Wait a few days before proposing a new release, so a compromised or broken
+    # version is usually caught and yanked by others first. Security updates
+    # are not delayed.
+    cooldown:
+      default-days: 5
+    # One pull request per week for all Go updates instead of one per module.
+    groups:
+      go-dependencies:
+        patterns: ["*"]
+    commit-message:
+      prefix: "deps"
+
+  # Actions used in .github/workflows. Dependabot updates the pinned commit SHA
+  # and the "# vX.Y.Z" comment next to it.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 5
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"
