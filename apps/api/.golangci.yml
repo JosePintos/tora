@@ -1,0 +1,21 @@
+# golangci-lint v2 configuration. Docs: https://golangci-lint.run/docs/configuration/
+version: "2"
+
+linters:
+  # errcheck, govet, ineffassign, staticcheck, unused
+  default: standard
+  enable:
+    # Enforces the error conventions from docs/adrs/error-kinds.md:
+    # wrap with %w, compare with errors.Is/As instead of == or type switches.
+    - errorlint
+    # Security checks (for example G112: http.Server without ReadHeaderTimeout).
+    - gosec
+  exclusions:
+    # Skip only files with the standard "Code generated ... DO NOT EDIT." header
+    # (gqlgen's generated.go, models_gen.go and sqlc output). Resolver files are
+    # hand-written despite their gqlgen comment, so they must still be linted.
+    generated: strict
+
+formatters:
+  enable:
+    - gofmt

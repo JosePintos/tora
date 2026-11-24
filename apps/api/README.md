@@ -53,7 +53,16 @@ go test ./...                                                # unit + integratio
 go test $(go list ./... | grep -v persistence/postgres)      # unit only
 ```
 
-Integration tests read `.env.test` and apply the migrations to `tora_test` themselves.
+Integration tests read `.env.test` and apply the migrations to `tora_test` themselves. Run them one package at a time (`-p 1`), because the packages share and truncate the same database.
+
+## Lint and security checks
+
+```bash
+golangci-lint run ./...                                      # golangci-lint v2, config in .golangci.yml
+go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...       # known vulnerabilities in reachable code
+```
+
+CI (`.github/workflows/api.yml`) runs lint, unit and integration tests, and `govulncheck` on every push to `main` and on pull requests.
 
 ## Code generation
 

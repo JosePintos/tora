@@ -19,7 +19,7 @@ func TestKindOf(t *testing.T) {
 		{"classified error", errSentinel, apperror.Conflict},
 		{"wrapped classified error keeps its kind", fmt.Errorf("create user: %w", errSentinel), apperror.Conflict},
 		{"plain error is internal", errors.New("connection refused"), apperror.Internal},
-		{"error wrapped with %v loses its kind", fmt.Errorf("create user: %v", errSentinel), apperror.Internal},
+		{"error wrapped with %v loses its kind", fmt.Errorf("create user: %v", errSentinel), apperror.Internal}, //nolint:errorlint // %v on purpose: proves the kind is lost
 	}
 
 	for _, tt := range tests {

@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -29,7 +30,7 @@ func Migrate(t *testing.T, databaseURL string) {
 		}
 	}()
 
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		t.Fatalf("failed to apply migrations: %v", err)
 	}
 }

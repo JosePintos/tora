@@ -277,7 +277,15 @@ sqlc generate
 
 # Generate gqlgen code after editing GraphQL schemas
 gqlgen generate
+
+# Lint and check for known vulnerabilities (same versions as CI)
+golangci-lint run ./...
+go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
 ```
+
+CI uses golangci-lint v2 (see `.github/workflows/api.yml` for the exact version). A local v1 install can't read the v2 config. Install a matching v2 with `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@<version>`.
+
+On Windows, `-race` needs cgo and a C compiler, so the race detector usually runs only in CI.
 
 ### Databases
 
@@ -419,7 +427,21 @@ These are acknowledged, not yet addressed. Don't fix them as a side effect of an
 - This is a solo project; pull requests are optional.
 - Merge into `main` using `git merge --no-ff` when the work is ready.
 - Do not push, merge, or rewrite Git history unless explicitly requested.
-- There is currently no CI pipeline; `.github/` is empty.
+
+## CI
+
+`.github/workflows/api.yml` runs on pushes to `main` and on pull requests that touch `apps/api/**`. It has three jobs:
+
+- **Lint:** golangci-lint v2 with `apps/api/.golangci.yml`, which includes `go vet`, `errorlint` and `gosec`.
+- **Test:** build, unit tests with `-race`, then the repository integration tests against a `postgres:17` service on port 5433. Integration tests run with `-p 1` because the packages share one database that each one truncates.
+- **Vulnerability check:** `govulncheck`. It fails only on vulnerabilities the code can actually reach.
+
+Conventions:
+
+- Pin third-party actions to a full commit SHA with the tag in a comment, and keep `permissions: contents: read` unless a job needs more.
+- Keep the golangci-lint and govulncheck versions pinned in the workflow; update them on purpose, not implicitly.
+- Fix lint findings rather than silencing them. A `//nolint:<linter>` needs a reason in the comment.
+- The `go` line in `go.mod` sets the Go version CI uses, so raise it when a Go security release ships. `govulncheck` reports when that's needed.
 
 ## Definition of done
 
