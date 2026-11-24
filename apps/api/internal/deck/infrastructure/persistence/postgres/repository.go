@@ -2,11 +2,13 @@ package postgres
 
 import (
 	"context"
+	"errors"
 
 	"github.com/JosePintos/tora/apps/api/internal/deck/application/ports"
 	"github.com/JosePintos/tora/apps/api/internal/deck/domain"
 	"github.com/JosePintos/tora/apps/api/internal/platform/database/sqlc"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -27,6 +29,9 @@ func (r *Repository) Create(ctx context.Context, deck *domain.Deck) error {
 
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Deck, error) {
 	deck, err := r.queries.GetDeckByID(ctx, pgtype.UUID{Bytes: id, Valid: true})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
