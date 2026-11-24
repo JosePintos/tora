@@ -1,6 +1,6 @@
 module github.com/JosePintos/tora/apps/api
 
-go 1.26.4
+go 1.26.11
 
 require (
 	github.com/99designs/gqlgen v0.17.93
@@ -23,6 +23,6 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/sosodev/duration v1.4.0 // indirect
-	golang.org/x/sync v0.21.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 )
