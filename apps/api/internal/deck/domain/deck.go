@@ -34,6 +34,12 @@ func NewDeck(ownerID uuid.UUID, name string) (*Deck, error) {
 	}, nil
 }
 
+// IsOwnedBy reports whether userID owns the deck. Only the owner may read or
+// change a deck and its cards.
+func (d *Deck) IsOwnedBy(userID uuid.UUID) bool {
+	return d.OwnerID == userID
+}
+
 func (d *Deck) Rename(newName string) error {
 	if err := validateDeckName(newName); err != nil {
 		return err

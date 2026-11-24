@@ -6,6 +6,20 @@ type AuthPayload struct {
 	Token string `json:"token"`
 }
 
+type Card struct {
+	ID        string `json:"id"`
+	DeckID    string `json:"deckId"`
+	Front     string `json:"front"`
+	Back      string `json:"back"`
+	CreatedAt string `json:"createdAt"`
+}
+
+type CreateCardInput struct {
+	DeckID string `json:"deckId"`
+	Front  string `json:"front"`
+	Back   string `json:"back"`
+}
+
 type CreateDeckInput struct {
 	Name string `json:"name"`
 }

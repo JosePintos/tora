@@ -8,6 +8,7 @@ import (
 	"github.com/JosePintos/tora/apps/api/internal/platform/database/sqlc"
 	testdb "github.com/JosePintos/tora/apps/api/test/database"
 	"github.com/JosePintos/tora/apps/api/test/fixtures"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -64,5 +65,19 @@ func TestCreateDeck(t *testing.T) {
 		if d.ID != deck.ID {
 			t.Errorf("expected deck ID %s, got %s", deck.ID, d.ID)
 		}
+	}
+}
+
+func TestGetByID_MissingDeckReturnsNilNil(t *testing.T) {
+	db := testdb.New(t)
+
+	repo := New(sqlc.New(db))
+
+	deck, err := repo.GetByID(context.Background(), uuid.New())
+	if err != nil {
+		t.Fatalf("expected no error for a missing deck, got %v", err)
+	}
+	if deck != nil {
+		t.Fatalf("expected nil deck, got %+v", deck)
 	}
 }

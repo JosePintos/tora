@@ -11,6 +11,9 @@ import (
 	"strings"
 	"testing"
 
+	cardservices "github.com/JosePintos/tora/apps/api/internal/card/application/services"
+	carddomain "github.com/JosePintos/tora/apps/api/internal/card/domain"
+	"github.com/JosePintos/tora/apps/api/internal/card/infrastructure/deckaccess"
 	deckservices "github.com/JosePintos/tora/apps/api/internal/deck/application/services"
 	deckdomain "github.com/JosePintos/tora/apps/api/internal/deck/domain"
 	"github.com/JosePintos/tora/apps/api/internal/interfaces/graphql/resolvers"
@@ -24,7 +27,8 @@ import (
 // whole error path: domain/service error -> gqlgen -> error presenter -> JSON.
 
 type mockDeckRepository struct {
-	CreateFn func(ctx context.Context, deck *deckdomain.Deck) error
+	CreateFn  func(ctx context.Context, deck *deckdomain.Deck) error
+	GetByIDFn func(ctx context.Context, id uuid.UUID) (*deckdomain.Deck, error)
 }
 
 func (m *mockDeckRepository) Create(ctx context.Context, deck *deckdomain.Deck) error {
@@ -34,7 +38,10 @@ func (m *mockDeckRepository) Create(ctx context.Context, deck *deckdomain.Deck) 
 	return nil
 }
 
-func (m *mockDeckRepository) GetByID(context.Context, uuid.UUID) (*deckdomain.Deck, error) {
+func (m *mockDeckRepository) GetByID(ctx context.Context, id uuid.UUID) (*deckdomain.Deck, error) {
+	if m.GetByIDFn != nil {
+		return m.GetByIDFn(ctx, id)
+	}
 	return nil, nil
 }
 
@@ -246,5 +253,126 @@ func TestRouter_ErrorResponses(t *testing.T) {
 				t.Errorf("expected log to contain %q, got %q", tt.wantLogged, logs.String())
 			}
 		})
+	}
+}
+
+type mockCardRepository struct {
+	created []*carddomain.Card
+}
+
+func (m *mockCardRepository) Create(_ context.Context, card *carddomain.Card) error {
+	m.created = append(m.created, card)
+	return nil
+}
+
+func (m *mockCardRepository) ListByDeck(_ context.Context, deckID uuid.UUID) ([]*carddomain.Card, error) {
+	var result []*carddomain.Card
+	for _, card := range m.created {
+		if card.DeckID == deckID {
+			result = append(result, card)
+		}
+	}
+	return result, nil
+}
+
+// newCardTestRouter wires the real deck and card services (and the real
+// deckaccess adapter between them) over in-memory repositories. The token
+// "valid" authenticates as caller; decks maps each existing deck to its owner.
+func newCardTestRouter(caller uuid.UUID, decks map[uuid.UUID]uuid.UUID, cards *mockCardRepository) http.Handler {
+	deckRepo := &mockDeckRepository{GetByIDFn: func(_ context.Context, id uuid.UUID) (*deckdomain.Deck, error) {
+		owner, ok := decks[id]
+		if !ok {
+			return nil, nil
+		}
+		return &deckdomain.Deck{ID: id, OwnerID: owner, Name: "deck"}, nil
+	}}
+	tokens := mockTokenProvider{userID: caller}
+
+	deckService := deckservices.NewDeckService(deckRepo)
+	container := &bootstrap.Container{
+		UserService:   userservices.NewUserService(&mockUserRepository{}, mockPasswordHasher{}, tokens),
+		DeckService:   deckService,
+		CardService:   cardservices.NewCardService(cards, deckaccess.New(deckService)),
+		TokenProvider: tokens,
+	}
+
+	return NewRouter(resolvers.New(container), slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
+}
+
+func TestRouter_CardErrors(t *testing.T) {
+	caller, stranger := uuid.New(), uuid.New()
+	ownDeck, strangersDeck, missingDeck := uuid.New(), uuid.New(), uuid.New()
+	decks := map[uuid.UUID]uuid.UUID{ownDeck: caller, strangersDeck: stranger}
+
+	createCard := func(deckID string) string {
+		return `mutation { createCard(input: { deckId: "` + deckID + `", front: "猫", back: "cat" }) { id } }`
+	}
+
+	tests := []struct {
+		name        string
+		token       string
+		query       string
+		wantCode    string
+		wantMessage string
+	}{
+		{"create without token", "", createCard(ownDeck.String()), "UNAUTHENTICATED", "unauthenticated"},
+		{"create in another user's deck", "valid", createCard(strangersDeck.String()), "NOT_FOUND", "deck not found"},
+		{"create in a missing deck looks the same", "valid", createCard(missingDeck.String()), "NOT_FOUND", "deck not found"},
+		{"create with malformed deck id", "valid", createCard("not-a-uuid"), "BAD_USER_INPUT", "invalid id"},
+		{"create with empty front", "valid", `mutation { createCard(input: { deckId: "` + ownDeck.String() + `", front: " ", back: "cat" }) { id } }`, "BAD_USER_INPUT", "card front cannot be empty"},
+		{"list another user's deck", "valid", `{ cards(deckId: "` + strangersDeck.String() + `") { id } }`, "NOT_FOUND", "deck not found"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cards := &mockCardRepository{}
+			resp := doQuery(t, newCardTestRouter(caller, decks, cards), tt.token, tt.query)
+			got := resp.Errors[0]
+
+			if got.Extensions["code"] != tt.wantCode {
+				t.Errorf("code = %v, want %s", got.Extensions["code"], tt.wantCode)
+			}
+			if got.Message != tt.wantMessage {
+				t.Errorf("message = %q, want %q", got.Message, tt.wantMessage)
+			}
+			if len(cards.created) != 0 {
+				t.Errorf("expected no card to be created, got %d", len(cards.created))
+			}
+		})
+	}
+}
+
+func TestRouter_CreateAndListCards(t *testing.T) {
+	caller, deckID := uuid.New(), uuid.New()
+	cards := &mockCardRepository{}
+	router := newCardTestRouter(caller, map[uuid.UUID]uuid.UUID{deckID: caller}, cards)
+
+	post := func(query string) map[string]any {
+		t.Helper()
+		body, _ := json.Marshal(map[string]string{"query": query})
+		req := httptest.NewRequest(http.MethodPost, "/query", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer valid")
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+
+		var resp map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to decode response %q: %v", rec.Body.String(), err)
+		}
+		if resp["errors"] != nil {
+			t.Fatalf("unexpected errors: %s", rec.Body.String())
+		}
+		return resp["data"].(map[string]any)
+	}
+
+	created := post(`mutation { createCard(input: { deckId: "` + deckID.String() + `", front: " 猫 ", back: "cat" }) { id deckId front back } }`)["createCard"].(map[string]any)
+	if created["deckId"] != deckID.String() || created["front"] != "猫" || created["back"] != "cat" {
+		t.Fatalf("unexpected created card: %v", created)
+	}
+
+	listed := post(`{ cards(deckId: "` + deckID.String() + `") { id front } }`)["cards"].([]any)
+	if len(listed) != 1 || listed[0].(map[string]any)["id"] != created["id"] {
+		t.Fatalf("expected the created card to be listed, got %v", listed)
 	}
 }
