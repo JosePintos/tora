@@ -1,6 +1,9 @@
 package bootstrap
 
 import (
+	cardservices "github.com/JosePintos/tora/apps/api/internal/card/application/services"
+	"github.com/JosePintos/tora/apps/api/internal/card/infrastructure/deckaccess"
+	cardpostgres "github.com/JosePintos/tora/apps/api/internal/card/infrastructure/persistence/postgres"
 	deckservices "github.com/JosePintos/tora/apps/api/internal/deck/application/services"
 	deckpostgres "github.com/JosePintos/tora/apps/api/internal/deck/infrastructure/persistence/postgres"
 	"github.com/JosePintos/tora/apps/api/internal/platform/config"
@@ -15,6 +18,7 @@ import (
 type Container struct {
 	UserService   *userservices.UserService
 	DeckService   *deckservices.DeckService
+	CardService   *cardservices.CardService
 	TokenProvider ports.TokenProvider
 }
 
@@ -33,9 +37,14 @@ func New(db *pgxpool.Pool, cfg *config.Config) *Container {
 	deckRepository := deckpostgres.New(queries)
 	deckService := deckservices.NewDeckService(deckRepository)
 
+	// The card context reaches decks only through its DeckAccess port.
+	cardRepository := cardpostgres.New(queries)
+	cardService := cardservices.NewCardService(cardRepository, deckaccess.New(deckService))
+
 	return &Container{
 		UserService:   userService,
 		DeckService:   deckService,
+		CardService:   cardService,
 		TokenProvider: tokenProvider,
 	}
 }

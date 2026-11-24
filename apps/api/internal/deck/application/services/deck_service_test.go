@@ -12,6 +12,7 @@ import (
 )
 
 type MockDeckRepository struct {
+	GetByIDFn   func(context.Context, uuid.UUID) (*domain.Deck, error)
 	CreateFn    func(context.Context, *domain.Deck) error
 	CreatedDeck *domain.Deck
 	CreateCalls int
@@ -27,7 +28,10 @@ func (m *MockDeckRepository) Create(ctx context.Context, deck *domain.Deck) erro
 }
 
 func (m *MockDeckRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Deck, error) {
-	panic("not implemented")
+	if m.GetByIDFn != nil {
+		return m.GetByIDFn(ctx, id)
+	}
+	return nil, nil
 }
 
 func (m *MockDeckRepository) ListByOwner(ctx context.Context, ownerID uuid.UUID) ([]*domain.Deck, error) {
@@ -145,5 +149,47 @@ func TestCreateDeck_RepositoryError(t *testing.T) {
 	}
 	if deck != nil {
 		t.Fatal("expected nil deck on repository error")
+	}
+}
+
+func TestGetOwned(t *testing.T) {
+	owner := uuid.New()
+	deck, err := domain.NewDeck(owner, "JLPT N5")
+	if err != nil {
+		t.Fatalf("failed to build deck: %v", err)
+	}
+	errDatabase := errors.New("connection refused")
+
+	tests := []struct {
+		name     string
+		userID   uuid.UUID
+		repoDeck *domain.Deck
+		repoErr  error
+		wantDeck bool
+		wantErr  error
+	}{
+		{name: "owner gets the deck", userID: owner, repoDeck: deck, wantDeck: true},
+		{name: "another user's deck looks missing", userID: uuid.New(), repoDeck: deck, wantErr: ErrDeckNotFound},
+		{name: "missing deck", userID: owner, repoDeck: nil, wantErr: ErrDeckNotFound},
+		{name: "repository failure passes through", userID: owner, repoErr: errDatabase, wantErr: errDatabase},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &MockDeckRepository{
+				GetByIDFn: func(context.Context, uuid.UUID) (*domain.Deck, error) {
+					return tt.repoDeck, tt.repoErr
+				},
+			}
+
+			got, err := newTestDeckService(repo).GetOwned(context.Background(), tt.userID, deck.ID)
+
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("expected error %v, got %v", tt.wantErr, err)
+			}
+			if (got != nil) != tt.wantDeck {
+				t.Fatalf("expected deck returned = %v, got %v", tt.wantDeck, got)
+			}
+		})
 	}
 }

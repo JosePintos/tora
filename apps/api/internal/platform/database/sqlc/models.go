@@ -8,6 +8,14 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Card struct {
+	ID        pgtype.UUID
+	DeckID    pgtype.UUID
+	Front     string
+	Back      string
+	CreatedAt pgtype.Timestamptz
+}
+
 type Deck struct {
 	ID        pgtype.UUID
 	OwnerID   pgtype.UUID

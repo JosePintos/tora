@@ -1,0 +1,23 @@
+type Card {
+    id: ID!
+    deckId: ID!
+    front: String!
+    back: String!
+    createdAt: String!
+}
+
+input CreateCardInput {
+    deckId: ID!
+    front: String!
+    back: String!
+}
+
+extend type Mutation {
+    "Adds a card to one of the authenticated user's decks."
+    createCard(input: CreateCardInput!): Card!
+}
+
+extend type Query {
+    "Cards of one of the authenticated user's decks, oldest first."
+    cards(deckId: ID!): [Card!]!
+}

@@ -155,6 +155,14 @@ Bootstrap wires the implementations together.
 
 Do not put business logic in GraphQL resolvers or infrastructure adapters.
 
+### Communication between bounded contexts
+
+See `docs/adrs/context-integration.md`. A context never imports another context's packages from its domain or application layers. When it needs something from another context, it does this:
+
+- **Port:** it defines a small port in its own `application/ports` describing what it needs, in its own terms. For example, the card context's `DeckAccess.EnsureOwnsDeck`.
+- **Adapter:** an adapter in its own `infrastructure/` implements the port by calling the other context's application service, and translates that context's errors into its own (an anti-corruption layer). For example, `card/infrastructure/deckaccess` turns `deckservices.ErrDeckNotFound` into the card context's `ports.ErrDeckNotFound`.
+- **Wiring:** `platform/bootstrap` connects the adapter.
+
 ### Repository conventions
 
 When a requested row does not exist, repository methods currently return `(nil, nil)` rather than exposing `pgx.ErrNoRows`.
@@ -236,6 +244,10 @@ Do not assume the middleware enforces authorization.
 `Login` must not reveal whether a username exists. It returns the single `ErrInvalidCredentials` for both an unknown username and a wrong password. For an unknown username it still compares the password against a dummy hash, so both paths take the same time. Keep both properties when changing login.
 
 Ownership must come from the authenticated context, never from client-supplied ownership fields. For example, deck creation obtains `OwnerID` from the authenticated user rather than accepting it in `CreateDeckInput`.
+
+Every operation on an existing resource must check that the authenticated user owns it; an ID taken from client input is not proof of access (IDOR). A resource owned by another user gets the same `NOT_FOUND` error as a missing one, so IDs can't be probed. The ownership rule lives in the domain (`Deck.IsOwnedBy`) and is applied by the owning context's service (`DeckService.GetOwned`).
+
+GraphQL `ID` arguments are strings. Resolvers convert them with `mapper.ParseID`, which returns `BAD_USER_INPUT` "invalid id" for anything that isn't a UUID.
 
 ## Database and migrations
 
@@ -400,13 +412,7 @@ go test $(go list ./... | grep -v persistence/postgres)
 
 ## Feature status
 
-The `card` context currently has:
-- Domain implementation.
-- Repository port.
-- Migration `000004`.
-- sqlc queries.
-
-The application service, PostgreSQL repository adapter, and GraphQL operations are not yet implemented. The card domain errors still use `errors.New` and must be given a kind (`apperror.Invalid`) before they are exposed through GraphQL. Verify the actual code before assuming this status is still current, and update this section as the feature progresses.
+The `card` context covers front/back cards. Users can add cards to their own decks (`createCard`) and list a deck's cards (`cards(deckId)`), oldest first. Cards are not yet nested under `Deck` in the schema. A nested `Deck.cards` field would need a DataLoader to avoid N+1 queries. The richer card types in `docs/domain.md` (vocabulary, kanji, grammar) aren't modelled yet; add them when a feature needs them. Verify the actual code before assuming this status is still current, and update this section as features progress.
 
 ### Known gaps
 
@@ -417,8 +423,8 @@ These are acknowledged, not yet addressed. Don't fix them as a side effect of an
 - `decks.owner_id` has no index, although `ListDecksByOwner` filters on it.
 - Validation is split: username length and password rules live in `UserService` instead of the user domain (the empty-username rule is already shared through `domain.ErrEmptyUsername`).
 - Errors from gqlgen's own argument unmarshalling (for example a malformed custom scalar) arrive at the presenter unclassified and are reported as `INTERNAL_SERVER_ERROR`. This doesn't matter while every input is a `String`, but it will once custom scalars are added.
-- `DeckRepository` declares `Update` and `Delete`, whose Postgres adapter panics with "not implemented".
-- The card port takes `deckID *uuid.UUID`, while everything else uses `uuid.UUID`.
+- There's no pagination: `decks` and `cards` return every row. Add cursor pagination (`docs/attributes.md`) before lists can grow large.
+- Updating and deleting decks and cards isn't implemented. `DeckRepository.Update` and `Delete` still panic.
 - The domain calls `time.Now()` directly, so timestamps can't be controlled in tests.
 
 ## Repository conventions

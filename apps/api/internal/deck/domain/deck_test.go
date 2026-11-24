@@ -91,3 +91,18 @@ func TestNewDeck_NameLengthCountsCharactersNotBytes(t *testing.T) {
 		t.Fatalf("expected ErrDeckNameTooLong for 101 characters, got %v", err)
 	}
 }
+
+func TestDeck_IsOwnedBy(t *testing.T) {
+	owner := uuid.New()
+	deck, err := NewDeck(owner, "JLPT N5")
+	if err != nil {
+		t.Fatalf("failed to build deck: %v", err)
+	}
+
+	if !deck.IsOwnedBy(owner) {
+		t.Fatal("expected the creator to own the deck")
+	}
+	if deck.IsOwnedBy(uuid.New()) {
+		t.Fatal("expected another user not to own the deck")
+	}
+}
