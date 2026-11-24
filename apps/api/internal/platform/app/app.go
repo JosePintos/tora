@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -59,7 +60,7 @@ func (a *App) Run() {
 	a.Logger.Info("starting server", "port", a.Config.Server.Port, "environment", a.Config.Environment)
 
 	go func() {
-		if err := a.Server.Run(); err != nil && err != http.ErrServerClosed {
+		if err := a.Server.Run(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			a.Logger.Error("server failed", "error", err)
 		}
 	}()

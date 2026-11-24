@@ -27,7 +27,7 @@ var (
 // dummyPassword is hashed once to give Login a real hash to compare against when
 // the username does not exist. Its value is irrelevant; it never matches anything
 // that grants access.
-const dummyPassword = "tora-login-timing-equalizer"
+const dummyPassword = "tora-login-timing-equalizer" //nolint:gosec // G101 false positive: not a credential, it guards nothing
 
 type UserService struct {
 	userRepository ports.UserRepository

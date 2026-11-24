@@ -427,8 +427,11 @@ func TestLogin_UnknownUserAndWrongPasswordAreIndistinguishable(t *testing.T) {
 	_, unknownErr := service.Login(context.Background(), commands.LoginCommand{Username: "nobody", Password: "x"})
 	_, wrongPasswordErr := service.Login(context.Background(), commands.LoginCommand{Username: "alice", Password: "x"})
 
-	if unknownErr != wrongPasswordErr {
-		t.Fatalf("expected the exact same error, got %q and %q", unknownErr, wrongPasswordErr)
+	if !errors.Is(unknownErr, ErrInvalidCredentials) || !errors.Is(wrongPasswordErr, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials for both, got %q and %q", unknownErr, wrongPasswordErr)
+	}
+	if unknownErr.Error() != wrongPasswordErr.Error() {
+		t.Fatalf("expected identical messages, got %q and %q", unknownErr, wrongPasswordErr)
 	}
 }
 
