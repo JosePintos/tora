@@ -1,0 +1,14 @@
+# Store text files with LF in the repository and check them out with LF on
+# every platform, whatever each machine's core.autocrlf says. gofmt, sqlc and
+# gqlgen all expect LF, and CI compares their output byte for byte.
+* text=auto eol=lf
+
+# Binary files: never convert or diff them as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
