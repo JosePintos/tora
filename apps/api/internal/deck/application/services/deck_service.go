@@ -50,6 +50,36 @@ func (s *DeckService) GetOwned(ctx context.Context, ownerID, deckID uuid.UUID) (
 	return deck, nil
 }
 
+// GetOwnedMany is the batch version of GetOwned, for callers that need many
+// decks at once (for example a DataLoader). It returns the decks only if ownerID
+// owns every one of them; if any is missing or owned by someone else it returns
+// ErrDeckNotFound, without saying which. Duplicate IDs are allowed.
+func (s *DeckService) GetOwnedMany(ctx context.Context, ownerID uuid.UUID, deckIDs []uuid.UUID) ([]*domain.Deck, error) {
+	if len(deckIDs) == 0 {
+		return []*domain.Deck{}, nil
+	}
+
+	decks, err := s.deckRepository.ListByIDs(ctx, deckIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	owned := make(map[uuid.UUID]bool, len(decks))
+	for _, deck := range decks {
+		if !deck.IsOwnedBy(ownerID) {
+			return nil, ErrDeckNotFound
+		}
+		owned[deck.ID] = true
+	}
+	for _, id := range deckIDs {
+		if !owned[id] {
+			return nil, ErrDeckNotFound
+		}
+	}
+
+	return decks, nil
+}
+
 func (s *DeckService) ListByOwner(ctx context.Context, ownerID uuid.UUID) ([]*domain.Deck, error) {
 	return s.deckRepository.ListByOwner(ctx, ownerID)
 }

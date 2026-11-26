@@ -27,8 +27,17 @@ import (
 // whole error path: domain/service error -> gqlgen -> error presenter -> JSON.
 
 type mockDeckRepository struct {
-	CreateFn  func(ctx context.Context, deck *deckdomain.Deck) error
-	GetByIDFn func(ctx context.Context, id uuid.UUID) (*deckdomain.Deck, error)
+	CreateFn      func(ctx context.Context, deck *deckdomain.Deck) error
+	GetByIDFn     func(ctx context.Context, id uuid.UUID) (*deckdomain.Deck, error)
+	ListByIDsFn   func(ctx context.Context, ids []uuid.UUID) ([]*deckdomain.Deck, error)
+	ListByOwnerFn func(ctx context.Context, ownerID uuid.UUID) ([]*deckdomain.Deck, error)
+}
+
+func (m *mockDeckRepository) ListByIDs(ctx context.Context, ids []uuid.UUID) ([]*deckdomain.Deck, error) {
+	if m.ListByIDsFn != nil {
+		return m.ListByIDsFn(ctx, ids)
+	}
+	return nil, nil
 }
 
 func (m *mockDeckRepository) Create(ctx context.Context, deck *deckdomain.Deck) error {
@@ -45,7 +54,10 @@ func (m *mockDeckRepository) GetByID(ctx context.Context, id uuid.UUID) (*deckdo
 	return nil, nil
 }
 
-func (m *mockDeckRepository) ListByOwner(context.Context, uuid.UUID) ([]*deckdomain.Deck, error) {
+func (m *mockDeckRepository) ListByOwner(ctx context.Context, ownerID uuid.UUID) ([]*deckdomain.Deck, error) {
+	if m.ListByOwnerFn != nil {
+		return m.ListByOwnerFn(ctx, ownerID)
+	}
 	return nil, nil
 }
 
@@ -257,7 +269,22 @@ func TestRouter_ErrorResponses(t *testing.T) {
 }
 
 type mockCardRepository struct {
-	created []*carddomain.Card
+	created          []*carddomain.Card
+	listByDeckCalls  int
+	listByDecksCalls int
+}
+
+func (m *mockCardRepository) ListByDecks(_ context.Context, deckIDs []uuid.UUID) ([]*carddomain.Card, error) {
+	m.listByDecksCalls++
+	var result []*carddomain.Card
+	for _, card := range m.created {
+		for _, id := range deckIDs {
+			if card.DeckID == id {
+				result = append(result, card)
+			}
+		}
+	}
+	return result, nil
 }
 
 func (m *mockCardRepository) Create(_ context.Context, card *carddomain.Card) error {
@@ -266,6 +293,7 @@ func (m *mockCardRepository) Create(_ context.Context, card *carddomain.Card) er
 }
 
 func (m *mockCardRepository) ListByDeck(_ context.Context, deckID uuid.UUID) ([]*carddomain.Card, error) {
+	m.listByDeckCalls++
 	var result []*carddomain.Card
 	for _, card := range m.created {
 		if card.DeckID == deckID {
@@ -279,13 +307,33 @@ func (m *mockCardRepository) ListByDeck(_ context.Context, deckID uuid.UUID) ([]
 // deckaccess adapter between them) over in-memory repositories. The token
 // "valid" authenticates as caller; decks maps each existing deck to its owner.
 func newCardTestRouter(caller uuid.UUID, decks map[uuid.UUID]uuid.UUID, cards *mockCardRepository) http.Handler {
-	deckRepo := &mockDeckRepository{GetByIDFn: func(_ context.Context, id uuid.UUID) (*deckdomain.Deck, error) {
-		owner, ok := decks[id]
-		if !ok {
-			return nil, nil
-		}
-		return &deckdomain.Deck{ID: id, OwnerID: owner, Name: "deck"}, nil
-	}}
+	deckRepo := &mockDeckRepository{
+		GetByIDFn: func(_ context.Context, id uuid.UUID) (*deckdomain.Deck, error) {
+			owner, ok := decks[id]
+			if !ok {
+				return nil, nil
+			}
+			return &deckdomain.Deck{ID: id, OwnerID: owner, Name: "deck"}, nil
+		},
+		ListByIDsFn: func(_ context.Context, ids []uuid.UUID) ([]*deckdomain.Deck, error) {
+			var result []*deckdomain.Deck
+			for _, id := range ids {
+				if owner, ok := decks[id]; ok {
+					result = append(result, &deckdomain.Deck{ID: id, OwnerID: owner, Name: "deck"})
+				}
+			}
+			return result, nil
+		},
+		ListByOwnerFn: func(_ context.Context, ownerID uuid.UUID) ([]*deckdomain.Deck, error) {
+			var result []*deckdomain.Deck
+			for id, owner := range decks {
+				if owner == ownerID {
+					result = append(result, &deckdomain.Deck{ID: id, OwnerID: owner, Name: "deck"})
+				}
+			}
+			return result, nil
+		},
+	}
 	tokens := mockTokenProvider{userID: caller}
 
 	deckService := deckservices.NewDeckService(deckRepo)
@@ -374,5 +422,77 @@ func TestRouter_CreateAndListCards(t *testing.T) {
 	listed := post(`{ cards(deckId: "` + deckID.String() + `") { id front } }`)["cards"].([]any)
 	if len(listed) != 1 || listed[0].(map[string]any)["id"] != created["id"] {
 		t.Fatalf("expected the created card to be listed, got %v", listed)
+	}
+}
+
+// TestRouter_DeckCardsAreBatched is the N+1 regression test: listing 50 decks
+// with their cards must load all cards with ONE repository query, not 50.
+func TestRouter_DeckCardsAreBatched(t *testing.T) {
+	caller := uuid.New()
+	decks := map[uuid.UUID]uuid.UUID{}
+	cards := &mockCardRepository{}
+	for i := range 50 {
+		deckID := uuid.New()
+		decks[deckID] = caller
+		if i%2 == 0 { // half the decks have a card, half are empty
+			card, err := carddomain.NewCard(deckID, "front-"+deckID.String(), "back")
+			if err != nil {
+				t.Fatalf("failed to build card: %v", err)
+			}
+			cards.created = append(cards.created, card)
+		}
+	}
+	router := newCardTestRouter(caller, decks, cards)
+
+	body, _ := json.Marshal(map[string]string{"query": `{ decks { id cards { deckId front } } }`})
+	req := httptest.NewRequest(http.MethodPost, "/query", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer valid")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	var resp struct {
+		Data struct {
+			Decks []struct {
+				ID    string `json:"id"`
+				Cards []struct {
+					DeckID string `json:"deckId"`
+					Front  string `json:"front"`
+				} `json:"cards"`
+			} `json:"decks"`
+		} `json:"data"`
+		Errors []any `json:"errors"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response %q: %v", rec.Body.String(), err)
+	}
+	if resp.Errors != nil {
+		t.Fatalf("unexpected errors: %s", rec.Body.String())
+	}
+
+	if cards.listByDecksCalls != 1 || cards.listByDeckCalls != 0 {
+		t.Fatalf("expected 1 batched cards query for 50 decks, got %d batched and %d per-deck queries",
+			cards.listByDecksCalls, cards.listByDeckCalls)
+	}
+
+	if len(resp.Data.Decks) != 50 {
+		t.Fatalf("expected 50 decks, got %d", len(resp.Data.Decks))
+	}
+	withCards := 0
+	for _, deck := range resp.Data.Decks {
+		if deck.Cards == nil {
+			t.Fatalf("deck %s: cards must be [] not null", deck.ID)
+		}
+		for _, card := range deck.Cards {
+			if card.DeckID != deck.ID || card.Front != "front-"+deck.ID {
+				t.Fatalf("deck %s received another deck's card: %+v", deck.ID, card)
+			}
+		}
+		if len(deck.Cards) > 0 {
+			withCards++
+		}
+	}
+	if withCards != 25 {
+		t.Fatalf("expected 25 decks with a card, got %d", withCards)
 	}
 }

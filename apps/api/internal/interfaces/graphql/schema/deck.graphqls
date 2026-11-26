@@ -3,6 +3,8 @@ type Deck {
     ownerId: ID!
     name: String!
     createdAt: String!
+    "The deck's cards, oldest first. Batched across decks by a DataLoader."
+    cards: [Card!]!
 }
 
 input CreateDeckInput {

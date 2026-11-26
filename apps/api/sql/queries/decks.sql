@@ -23,3 +23,8 @@ SELECT *
 FROM decks
 WHERE owner_id = $1
 ORDER BY created_at;
+
+-- name: ListDecksByIDs :many
+SELECT *
+FROM decks
+WHERE id = ANY(@ids::uuid[]);

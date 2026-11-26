@@ -29,6 +29,8 @@ type Deck struct {
 	OwnerID   string `json:"ownerId"`
 	Name      string `json:"name"`
 	CreatedAt string `json:"createdAt"`
+	// The deck's cards, oldest first. Batched across decks by a DataLoader.
+	Cards []*Card `json:"cards"`
 }
 
 type LoginInput struct {

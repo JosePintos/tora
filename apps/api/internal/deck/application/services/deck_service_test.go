@@ -13,6 +13,7 @@ import (
 
 type MockDeckRepository struct {
 	GetByIDFn   func(context.Context, uuid.UUID) (*domain.Deck, error)
+	ListByIDsFn func(context.Context, []uuid.UUID) ([]*domain.Deck, error)
 	CreateFn    func(context.Context, *domain.Deck) error
 	CreatedDeck *domain.Deck
 	CreateCalls int
@@ -30,6 +31,13 @@ func (m *MockDeckRepository) Create(ctx context.Context, deck *domain.Deck) erro
 func (m *MockDeckRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Deck, error) {
 	if m.GetByIDFn != nil {
 		return m.GetByIDFn(ctx, id)
+	}
+	return nil, nil
+}
+
+func (m *MockDeckRepository) ListByIDs(ctx context.Context, ids []uuid.UUID) ([]*domain.Deck, error) {
+	if m.ListByIDsFn != nil {
+		return m.ListByIDsFn(ctx, ids)
 	}
 	return nil, nil
 }
@@ -191,5 +199,62 @@ func TestGetOwned(t *testing.T) {
 				t.Fatalf("expected deck returned = %v, got %v", tt.wantDeck, got)
 			}
 		})
+	}
+}
+
+func TestGetOwnedMany(t *testing.T) {
+	owner := uuid.New()
+	newDeck := func(ownerID uuid.UUID) *domain.Deck {
+		deck, err := domain.NewDeck(ownerID, "deck")
+		if err != nil {
+			t.Fatalf("failed to build deck: %v", err)
+		}
+		return deck
+	}
+	mine1, mine2, strangers := newDeck(owner), newDeck(owner), newDeck(uuid.New())
+	errDatabase := errors.New("connection refused")
+
+	tests := []struct {
+		name      string
+		ids       []uuid.UUID
+		stored    []*domain.Deck
+		repoErr   error
+		wantCount int
+		wantErr   error
+	}{
+		{name: "all owned", ids: []uuid.UUID{mine1.ID, mine2.ID}, stored: []*domain.Deck{mine1, mine2}, wantCount: 2},
+		{name: "duplicate ids are fine", ids: []uuid.UUID{mine1.ID, mine1.ID}, stored: []*domain.Deck{mine1}, wantCount: 1},
+		{name: "one deck owned by someone else fails the batch", ids: []uuid.UUID{mine1.ID, strangers.ID}, stored: []*domain.Deck{mine1, strangers}, wantErr: ErrDeckNotFound},
+		{name: "one missing deck fails the batch", ids: []uuid.UUID{mine1.ID, uuid.New()}, stored: []*domain.Deck{mine1}, wantErr: ErrDeckNotFound},
+		{name: "repository failure passes through", ids: []uuid.UUID{mine1.ID}, repoErr: errDatabase, wantErr: errDatabase},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &MockDeckRepository{ListByIDsFn: func(context.Context, []uuid.UUID) ([]*domain.Deck, error) {
+				return tt.stored, tt.repoErr
+			}}
+
+			decks, err := newTestDeckService(repo).GetOwnedMany(context.Background(), owner, tt.ids)
+
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("expected error %v, got %v", tt.wantErr, err)
+			}
+			if err == nil && len(decks) != tt.wantCount {
+				t.Fatalf("expected %d decks, got %d", tt.wantCount, len(decks))
+			}
+		})
+	}
+}
+
+func TestGetOwnedMany_EmptyInputSkipsRepository(t *testing.T) {
+	repo := &MockDeckRepository{ListByIDsFn: func(context.Context, []uuid.UUID) ([]*domain.Deck, error) {
+		t.Fatal("repository must not be called for an empty batch")
+		return nil, nil
+	}}
+
+	decks, err := newTestDeckService(repo).GetOwnedMany(context.Background(), uuid.New(), nil)
+	if err != nil || decks == nil || len(decks) != 0 {
+		t.Fatalf("expected an empty, non-nil result, got %v, %v", decks, err)
 	}
 }

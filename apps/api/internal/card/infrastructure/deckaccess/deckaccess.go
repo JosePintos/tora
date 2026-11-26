@@ -19,6 +19,7 @@ import (
 // easy to test.
 type DeckOwnership interface {
 	GetOwned(ctx context.Context, ownerID, deckID uuid.UUID) (*domain.Deck, error)
+	GetOwnedMany(ctx context.Context, ownerID uuid.UUID, deckIDs []uuid.UUID) ([]*domain.Deck, error)
 }
 
 type Adapter struct {
@@ -31,6 +32,14 @@ func New(decks DeckOwnership) *Adapter {
 
 func (a *Adapter) EnsureOwnsDeck(ctx context.Context, userID, deckID uuid.UUID) error {
 	_, err := a.decks.GetOwned(ctx, userID, deckID)
+	if errors.Is(err, deckservices.ErrDeckNotFound) {
+		return ports.ErrDeckNotFound
+	}
+	return err
+}
+
+func (a *Adapter) EnsureOwnsDecks(ctx context.Context, userID uuid.UUID, deckIDs []uuid.UUID) error {
+	_, err := a.decks.GetOwnedMany(ctx, userID, deckIDs)
 	if errors.Is(err, deckservices.ErrDeckNotFound) {
 		return ports.ErrDeckNotFound
 	}

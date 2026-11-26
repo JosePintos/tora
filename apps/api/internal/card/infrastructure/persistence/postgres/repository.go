@@ -39,4 +39,23 @@ func (r *Repository) ListByDeck(ctx context.Context, deckID uuid.UUID) ([]*domai
 	return result, nil
 }
 
+func (r *Repository) ListByDecks(ctx context.Context, deckIDs []uuid.UUID) ([]*domain.Card, error) {
+	pgIDs := make([]pgtype.UUID, len(deckIDs))
+	for i, id := range deckIDs {
+		pgIDs[i] = pgtype.UUID{Bytes: id, Valid: true}
+	}
+
+	cards, err := r.queries.ListCardsByDecks(ctx, pgIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*domain.Card, 0, len(cards))
+	for _, card := range cards {
+		result = append(result, toDomain(card))
+	}
+
+	return result, nil
+}
+
 var _ ports.CardRepository = (*Repository)(nil)

@@ -10,6 +10,9 @@ import (
 type DeckRepository interface {
 	Create(ctx context.Context, deck *domain.Deck) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Deck, error)
+	// ListByIDs returns the decks that exist among ids, in no particular order.
+	// Missing IDs are simply absent from the result.
+	ListByIDs(ctx context.Context, ids []uuid.UUID) ([]*domain.Deck, error)
 	ListByOwner(ctx context.Context, ownerID uuid.UUID) ([]*domain.Deck, error)
 	Update(ctx context.Context, deck *domain.Deck) error
 	Delete(ctx context.Context, id uuid.UUID) error

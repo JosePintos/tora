@@ -12,10 +12,11 @@ import (
 )
 
 type MockCardRepository struct {
-	CreateFn     func(context.Context, *domain.Card) error
-	ListByDeckFn func(context.Context, uuid.UUID) ([]*domain.Card, error)
-	CreateCalls  int
-	ListCalls    int
+	CreateFn      func(context.Context, *domain.Card) error
+	ListByDeckFn  func(context.Context, uuid.UUID) ([]*domain.Card, error)
+	ListByDecksFn func(context.Context, []uuid.UUID) ([]*domain.Card, error)
+	CreateCalls   int
+	ListCalls     int
 }
 
 func (m *MockCardRepository) Create(ctx context.Context, card *domain.Card) error {
@@ -34,9 +35,25 @@ func (m *MockCardRepository) ListByDeck(ctx context.Context, deckID uuid.UUID) (
 	return nil, nil
 }
 
+func (m *MockCardRepository) ListByDecks(ctx context.Context, deckIDs []uuid.UUID) ([]*domain.Card, error) {
+	m.ListCalls++
+	if m.ListByDecksFn != nil {
+		return m.ListByDecksFn(ctx, deckIDs)
+	}
+	return nil, nil
+}
+
 // MockDeckAccess grants access only to the (owner, deck) pair it was built with.
 type MockDeckAccess struct {
-	EnsureOwnsDeckFn func(ctx context.Context, userID, deckID uuid.UUID) error
+	EnsureOwnsDeckFn  func(ctx context.Context, userID, deckID uuid.UUID) error
+	EnsureOwnsDecksFn func(ctx context.Context, userID uuid.UUID, deckIDs []uuid.UUID) error
+}
+
+func (m *MockDeckAccess) EnsureOwnsDecks(ctx context.Context, userID uuid.UUID, deckIDs []uuid.UUID) error {
+	if m.EnsureOwnsDecksFn != nil {
+		return m.EnsureOwnsDecksFn(ctx, userID, deckIDs)
+	}
+	return nil
 }
 
 func (m *MockDeckAccess) EnsureOwnsDeck(ctx context.Context, userID, deckID uuid.UUID) error {
@@ -46,11 +63,30 @@ func (m *MockDeckAccess) EnsureOwnsDeck(ctx context.Context, userID, deckID uuid
 	return nil
 }
 
-func ownedBy(owner, deck uuid.UUID) *MockDeckAccess {
+func ownedBy(owner uuid.UUID, decks ...uuid.UUID) *MockDeckAccess {
+	owns := func(userID, deckID uuid.UUID) bool {
+		if userID != owner {
+			return false
+		}
+		for _, d := range decks {
+			if d == deckID {
+				return true
+			}
+		}
+		return false
+	}
 	return &MockDeckAccess{
 		EnsureOwnsDeckFn: func(_ context.Context, userID, deckID uuid.UUID) error {
-			if userID != owner || deckID != deck {
+			if !owns(userID, deckID) {
 				return ports.ErrDeckNotFound
+			}
+			return nil
+		},
+		EnsureOwnsDecksFn: func(_ context.Context, userID uuid.UUID, deckIDs []uuid.UUID) error {
+			for _, id := range deckIDs {
+				if !owns(userID, id) {
+					return ports.ErrDeckNotFound
+				}
 			}
 			return nil
 		},
@@ -173,5 +209,68 @@ func TestListByDeck_DeckNotOwned(t *testing.T) {
 	}
 	if repo.ListCalls != 0 {
 		t.Fatalf("expected the repository not to be queried, got %d calls", repo.ListCalls)
+	}
+}
+
+func TestListByDecks_GroupsCardsAndIncludesEmptyDecks(t *testing.T) {
+	owner, deckA, deckB, emptyDeck := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	newCard := func(deckID uuid.UUID, front string) *domain.Card {
+		card, err := domain.NewCard(deckID, front, "back")
+		if err != nil {
+			t.Fatalf("failed to build card: %v", err)
+		}
+		return card
+	}
+	a1, b1, a2 := newCard(deckA, "a1"), newCard(deckB, "b1"), newCard(deckA, "a2")
+
+	var queried []uuid.UUID
+	repo := &MockCardRepository{ListByDecksFn: func(_ context.Context, ids []uuid.UUID) ([]*domain.Card, error) {
+		queried = ids
+		return []*domain.Card{a1, a2, b1}, nil
+	}}
+
+	got, err := NewCardService(repo, ownedBy(owner, deckA, deckB, emptyDeck)).
+		ListByDecks(context.Background(), owner, []uuid.UUID{deckA, deckB, emptyDeck})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if repo.ListCalls != 1 || len(queried) != 3 {
+		t.Fatalf("expected one repository call with 3 decks, got %d calls with %v", repo.ListCalls, queried)
+	}
+	if len(got[deckA]) != 2 || got[deckA][0] != a1 || got[deckA][1] != a2 {
+		t.Fatalf("expected deck A's cards in repository order, got %v", got[deckA])
+	}
+	if len(got[deckB]) != 1 || got[deckB][0] != b1 {
+		t.Fatalf("expected deck B's card, got %v", got[deckB])
+	}
+	if cards, ok := got[emptyDeck]; !ok || cards == nil || len(cards) != 0 {
+		t.Fatalf("expected an empty, non-nil slice for a deck without cards, got %#v (present: %v)", cards, ok)
+	}
+}
+
+func TestListByDecks_OneUnownedDeckFailsTheBatch(t *testing.T) {
+	owner, mine := uuid.New(), uuid.New()
+	repo := &MockCardRepository{}
+
+	_, err := NewCardService(repo, ownedBy(owner, mine)).
+		ListByDecks(context.Background(), owner, []uuid.UUID{mine, uuid.New()})
+	if !errors.Is(err, ports.ErrDeckNotFound) {
+		t.Fatalf("expected ErrDeckNotFound, got %v", err)
+	}
+	if repo.ListCalls != 0 {
+		t.Fatalf("expected no cards to be loaded, got %d calls", repo.ListCalls)
+	}
+}
+
+func TestListByDecks_EmptyInput(t *testing.T) {
+	access := &MockDeckAccess{EnsureOwnsDecksFn: func(context.Context, uuid.UUID, []uuid.UUID) error {
+		t.Fatal("ownership must not be checked for an empty batch")
+		return nil
+	}}
+
+	got, err := NewCardService(&MockCardRepository{}, access).ListByDecks(context.Background(), uuid.New(), nil)
+	if err != nil || got == nil || len(got) != 0 {
+		t.Fatalf("expected an empty, non-nil map, got %v, %v", got, err)
 	}
 }

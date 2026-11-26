@@ -69,6 +69,37 @@ func (q *Queries) GetDeckByID(ctx context.Context, id pgtype.UUID) (Deck, error)
 	return i, err
 }
 
+const listDecksByIDs = `-- name: ListDecksByIDs :many
+SELECT id, owner_id, name, created_at
+FROM decks
+WHERE id = ANY($1::uuid[])
+`
+
+func (q *Queries) ListDecksByIDs(ctx context.Context, ids []pgtype.UUID) ([]Deck, error) {
+	rows, err := q.db.Query(ctx, listDecksByIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Deck
+	for rows.Next() {
+		var i Deck
+		if err := rows.Scan(
+			&i.ID,
+			&i.OwnerID,
+			&i.Name,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDecksByOwner = `-- name: ListDecksByOwner :many
 SELECT id, owner_id, name, created_at
 FROM decks

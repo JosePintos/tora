@@ -77,3 +77,38 @@ func (q *Queries) ListCardsByDeck(ctx context.Context, deckID pgtype.UUID) ([]Ca
 	}
 	return items, nil
 }
+
+const listCardsByDecks = `-- name: ListCardsByDecks :many
+SELECT id, deck_id, front, back, created_at
+FROM cards
+WHERE deck_id = ANY($1::uuid[])
+ORDER BY deck_id, created_at ASC, id ASC
+`
+
+// Cards of several decks in one query (used by the DataLoader for Deck.cards).
+// Same order as ListCardsByDeck within each deck.
+func (q *Queries) ListCardsByDecks(ctx context.Context, deckIds []pgtype.UUID) ([]Card, error) {
+	rows, err := q.db.Query(ctx, listCardsByDecks, deckIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Card
+	for rows.Next() {
+		var i Card
+		if err := rows.Scan(
+			&i.ID,
+			&i.DeckID,
+			&i.Front,
+			&i.Back,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
