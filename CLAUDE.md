@@ -210,6 +210,17 @@ GraphQL is centralized under `internal/interfaces/graphql/`.
 - `mapper/` contains conversions between domain objects and GraphQL models.
 - `auth/` contains authentication middleware and context helpers.
 - `errorpresenter/` maps application errors to GraphQL errors.
+- `loaders/` contains request-scoped DataLoaders (`vikstrous/dataloadgen`).
+
+### DataLoaders
+
+A field resolved once per parent object, such as `Deck.cards` for every deck in `decks`, must load through a DataLoader, never call a service directly. Otherwise each parent costs one query (N+1).
+
+- **Created per request:** `loaders.Middleware` creates the loaders for each authenticated request, after `AuthMiddleware`. Never share loaders between requests: they cache results, so a shared loader would leak one user's data to another.
+- **Batch contract:** a batch function returns exactly one value per key, in key order. A missing result means "no data" (for example an empty slice), not an error. Use `dataloadgen.NewLoader` rather than `NewMappedLoader`, which turns missing keys into `ErrNotFound`.
+- **Rules still in services:** batch functions call a batch method on the application service (`CardService.ListByDecks`), which checks ownership for the whole batch (`DeckAccess.EnsureOwnsDecks`, then `DeckService.GetOwnedMany`). Business rules don't move into the loader.
+- **Fields need a resolver:** a field served by a loader needs `resolver: true` for its model in `gqlgen.yml`.
+- **Regression test:** keep a test that counts repository calls, like `TestRouter_DeckCardsAreBatched`, so the N+1 problem can't come back silently.
 
 Do not expose domain entities or sqlc-generated database models directly through GraphQL.
 
@@ -412,7 +423,7 @@ go test $(go list ./... | grep -v persistence/postgres)
 
 ## Feature status
 
-The `card` context covers front/back cards. Users can add cards to their own decks (`createCard`) and list a deck's cards (`cards(deckId)`), oldest first. Cards are not yet nested under `Deck` in the schema. A nested `Deck.cards` field would need a DataLoader to avoid N+1 queries. The richer card types in `docs/domain.md` (vocabulary, kanji, grammar) aren't modelled yet; add them when a feature needs them. Verify the actual code before assuming this status is still current, and update this section as features progress.
+The `card` context covers front/back cards. Users can add cards to their own decks (`createCard`) and list a deck's cards, oldest first, either with `cards(deckId)` or nested as `Deck.cards`. `Deck.cards` is batched by the `CardsByDeck` DataLoader: listing N decks with their cards costs one cards query, not N. The richer card types in `docs/domain.md` (vocabulary, kanji, grammar) aren't modelled yet; add them when a feature needs them. Verify the actual code before assuming this status is still current, and update this section as features progress.
 
 ### Known gaps
 
@@ -423,7 +434,8 @@ These are acknowledged, not yet addressed. Don't fix them as a side effect of an
 - `decks.owner_id` has no index, although `ListDecksByOwner` filters on it.
 - Validation is split: username length and password rules live in `UserService` instead of the user domain (the empty-username rule is already shared through `domain.ErrEmptyUsername`).
 - Errors from gqlgen's own argument unmarshalling (for example a malformed custom scalar) arrive at the presenter unclassified and are reported as `INTERNAL_SERVER_ERROR`. This doesn't matter while every input is a `String`, but it will once custom scalars are added.
-- There's no pagination: `decks` and `cards` return every row. Add cursor pagination (`docs/attributes.md`) before lists can grow large.
+- There's no pagination: `decks`, `cards` and `Deck.cards` return every row. Add cursor pagination (`docs/attributes.md`) before lists can grow large. Limiting cards *per deck* inside the batched query will need a window function (`ROW_NUMBER() OVER (PARTITION BY deck_id ...)`) or a `LATERAL` join, not a plain `LIMIT`.
+- If any deck in a `Deck.cards` batch isn't owned by the caller, the whole batch fails with `NOT_FOUND`. That can't happen today, because only the caller's own decks are reachable.
 - Updating and deleting decks and cards isn't implemented. `DeckRepository.Update` and `Delete` still panic.
 - The domain calls `time.Now()` directly, so timestamps can't be controlled in tests.
 
