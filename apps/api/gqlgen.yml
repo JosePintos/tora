@@ -158,6 +158,12 @@ autobind:
 # modelgen, the others will be allowed when binding to fields. Configure them to
 # your liking
 models:
+  # Deck.cards is resolved by a resolver function (through the cards DataLoader),
+  # not stored as a field on the Deck model.
+  Deck:
+    fields:
+      cards:
+        resolver: true
   ID:
     model:
       - github.com/99designs/gqlgen/graphql.ID

@@ -81,3 +81,37 @@ func TestGetByID_MissingDeckReturnsNilNil(t *testing.T) {
 		t.Fatalf("expected nil deck, got %+v", deck)
 	}
 }
+
+func TestListByIDs(t *testing.T) {
+	db := testdb.New(t)
+	queries := sqlc.New(db)
+	repo := New(queries)
+
+	user := fixtures.CreateUser(t, queries)
+	first, err := domain.NewDeck(user.ID.Bytes, "first")
+	if err != nil {
+		t.Fatalf("failed to build deck: %v", err)
+	}
+	second, err := domain.NewDeck(user.ID.Bytes, "second")
+	if err != nil {
+		t.Fatalf("failed to build deck: %v", err)
+	}
+	for _, deck := range []*domain.Deck{first, second} {
+		if err := repo.Create(context.Background(), deck); err != nil {
+			t.Fatalf("failed to create deck: %v", err)
+		}
+	}
+
+	decks, err := repo.ListByIDs(context.Background(), []uuid.UUID{first.ID, uuid.New(), second.ID})
+	if err != nil {
+		t.Fatalf("failed to list decks: %v", err)
+	}
+
+	got := map[uuid.UUID]bool{}
+	for _, deck := range decks {
+		got[deck.ID] = true
+	}
+	if len(decks) != 2 || !got[first.ID] || !got[second.ID] {
+		t.Fatalf("expected exactly the two existing decks, got %v", got)
+	}
+}

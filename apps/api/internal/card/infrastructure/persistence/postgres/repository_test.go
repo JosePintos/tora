@@ -87,3 +87,50 @@ func TestListByDeck_EmptyDeckReturnsEmptySlice(t *testing.T) {
 		t.Fatalf("expected an empty, non-nil slice, got %#v", cards)
 	}
 }
+
+func TestListByDecks(t *testing.T) {
+	db := testdb.New(t)
+	queries := sqlc.New(db)
+	repo := New(queries)
+
+	deckA, deckB, otherDeck := createDeck(t, queries), createDeck(t, queries), createDeck(t, queries)
+
+	a1, err := domain.NewCard(deckA, "a1", "back")
+	if err != nil {
+		t.Fatalf("failed to build card: %v", err)
+	}
+	a2, err := domain.NewCard(deckA, "a2", "back")
+	if err != nil {
+		t.Fatalf("failed to build card: %v", err)
+	}
+	a2.CreatedAt = a1.CreatedAt.Add(time.Second)
+	b1, err := domain.NewCard(deckB, "b1", "back")
+	if err != nil {
+		t.Fatalf("failed to build card: %v", err)
+	}
+	other, err := domain.NewCard(otherDeck, "other", "back")
+	if err != nil {
+		t.Fatalf("failed to build card: %v", err)
+	}
+	for _, card := range []*domain.Card{a2, b1, a1, other} {
+		if err := repo.Create(context.Background(), card); err != nil {
+			t.Fatalf("failed to create card: %v", err)
+		}
+	}
+
+	cards, err := repo.ListByDecks(context.Background(), []uuid.UUID{deckA, deckB})
+	if err != nil {
+		t.Fatalf("failed to list cards: %v", err)
+	}
+
+	byDeck := map[uuid.UUID][]string{}
+	for _, card := range cards {
+		byDeck[card.DeckID] = append(byDeck[card.DeckID], card.Front)
+	}
+	if len(cards) != 3 || len(byDeck[otherDeck]) != 0 {
+		t.Fatalf("expected only the 3 cards of the requested decks, got %v", byDeck)
+	}
+	if got := byDeck[deckA]; len(got) != 2 || got[0] != "a1" || got[1] != "a2" {
+		t.Fatalf("expected deck A's cards oldest first, got %v", got)
+	}
+}

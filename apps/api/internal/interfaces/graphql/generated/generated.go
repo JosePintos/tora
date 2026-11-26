@@ -27,6 +27,7 @@ func NewExecutableSchema(cfg Config) graphql.ExecutableSchema {
 type Config = graphql.Config[ResolverRoot, DirectiveRoot, ComplexityRoot]
 
 type ResolverRoot interface {
+	Deck() DeckResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
 }
@@ -48,6 +49,7 @@ type ComplexityRoot struct {
 	}
 
 	Deck struct {
+		Cards     func(childComplexity int) int
 		CreatedAt func(childComplexity int) int
 		ID        func(childComplexity int) int
 		Name      func(childComplexity int) int
@@ -78,6 +80,9 @@ type ComplexityRoot struct {
 
 // region    ************************** generated!.gotpl **************************
 
+type DeckResolver interface {
+	Cards(ctx context.Context, obj *model.Deck) ([]*model.Card, error)
+}
 type MutationResolver interface {
 	Register(ctx context.Context, input model.RegisterInput) (*model.User, error)
 	Login(ctx context.Context, input model.LoginInput) (*model.AuthPayload, error)
@@ -146,6 +151,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Card.ID(childComplexity), true
 
+	case "Deck.cards":
+		if e.ComplexityRoot.Deck.Cards == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Deck.Cards(childComplexity), true
 	case "Deck.createdAt":
 		if e.ComplexityRoot.Deck.CreatedAt == nil {
 			break
@@ -389,6 +400,8 @@ extend type Query {
     ownerId: ID!
     name: String!
     createdAt: String!
+    "The deck's cards, oldest first. Batched across decks by a DataLoader."
+    cards: [Card!]!
 }
 
 input CreateDeckInput {
@@ -461,6 +474,8 @@ func (ec *executionContext) childFields_Deck(ctx context.Context, field graphql.
 		return ec.fieldContext_Deck_name(ctx, field)
 	case "createdAt":
 		return ec.fieldContext_Deck_createdAt(ctx, field)
+	case "cards":
+		return ec.fieldContext_Deck_cards(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Deck", field.Name)
 }
@@ -979,6 +994,38 @@ func (ec *executionContext) _Deck_createdAt(ctx context.Context, field graphql.C
 }
 func (ec *executionContext) fieldContext_Deck_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Deck", field, false, false, "String")
+}
+
+func (ec *executionContext) _Deck_cards(ctx context.Context, field graphql.CollectedField, obj *model.Deck) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Deck_cards(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Deck().Cards(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.Card) graphql.Marshaler {
+			return ec.marshalNCard2ᚕᚖgithubᚗcomᚋJosePintosᚋtoraᚋappsᚋapiᚋinternalᚋinterfacesᚋgraphqlᚋmodelᚐCardᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Deck_cards(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Deck",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Card(ctx, field)
+		},
+	}
+	return fc, nil
 }
 
 func (ec *executionContext) _Mutation_register(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -2778,23 +2825,29 @@ func (ec *executionContext) _Deck(ctx context.Context, sel ast.SelectionSet, obj
 		case "id":
 			out.Values[i] = ec._Deck_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "ownerId":
 			out.Values[i] = ec._Deck_ownerId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "name":
 			out.Values[i] = ec._Deck_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "createdAt":
 			out.Values[i] = ec._Deck_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "cards":
+			out.ResolveConcurrently(ec.OperationContext, &deferred, i,
+				true, true,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._Deck_cards(ctx, field, obj)
+				})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

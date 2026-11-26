@@ -36,6 +36,13 @@ func (m *MockDeckRepository) GetByID(
 	return nil, nil
 }
 
+func (m *MockDeckRepository) ListByIDs(
+	ctx context.Context,
+	ids []uuid.UUID,
+) ([]*domain.Deck, error) {
+	return nil, nil
+}
+
 func (m *MockDeckRepository) ListByOwner(
 	ctx context.Context,
 	ownerID uuid.UUID,

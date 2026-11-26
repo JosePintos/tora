@@ -18,7 +18,7 @@ Cursor pagination
 
 Indexes
 
-DataLoader ?
+DataLoader (per-request, used by Deck.cards)
 
 Caching later
 

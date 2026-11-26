@@ -7,12 +7,41 @@ package resolvers
 
 import (
 	"context"
+	"errors"
 
 	"github.com/JosePintos/tora/apps/api/internal/deck/application/commands"
 	"github.com/JosePintos/tora/apps/api/internal/interfaces/graphql/auth"
+	"github.com/JosePintos/tora/apps/api/internal/interfaces/graphql/generated"
+	"github.com/JosePintos/tora/apps/api/internal/interfaces/graphql/loaders"
 	"github.com/JosePintos/tora/apps/api/internal/interfaces/graphql/mapper"
 	"github.com/JosePintos/tora/apps/api/internal/interfaces/graphql/model"
 )
+
+// Cards is the resolver for the cards field.
+func (r *deckResolver) Cards(ctx context.Context, obj *model.Deck) ([]*model.Card, error) {
+	if _, ok := auth.UserIDFromContext(ctx); !ok {
+		return nil, auth.ErrUnauthenticated
+	}
+
+	loader := loaders.For(ctx)
+	if loader == nil {
+		return nil, errors.New("cards loader missing from request context")
+	}
+
+	deckID, err := mapper.ParseID(obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Doesn't query yet: the loader collects the deck IDs requested by every
+	// Deck.cards resolver in this request and loads them in one batch.
+	cards, err := loader.CardsByDeck.Load(ctx, deckID)
+	if err != nil {
+		return nil, err
+	}
+
+	return mapper.ToGraphQLCards(cards), nil
+}
 
 // CreateDeck is the resolver for the createDeck field.
 func (r *mutationResolver) CreateDeck(ctx context.Context, input model.CreateDeckInput) (*model.Deck, error) {
@@ -52,3 +81,8 @@ func (r *queryResolver) Decks(ctx context.Context) ([]*model.Deck, error) {
 
 	return graphqlDecks, nil
 }
+
+// Deck returns generated.DeckResolver implementation.
+func (r *Resolver) Deck() generated.DeckResolver { return &deckResolver{r} }
+
+type deckResolver struct{ *Resolver }

@@ -10,11 +10,13 @@ require (
 	github.com/jackc/pgx/v5 v5.13.0
 	github.com/joho/godotenv v1.5.1
 	github.com/vektah/gqlparser/v2 v2.5.64
+	github.com/vikstrous/dataloadgen v0.0.10
 	golang.org/x/crypto v0.59.0
 )
 
 require (
 	github.com/agnivade/levenshtein v1.2.2 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/coder/websocket v1.8.15 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
@@ -25,6 +27,8 @@ require (
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/sosodev/duration v1.4.0 // indirect
 	github.com/urfave/cli/v3 v3.14.0 // indirect
+	go.opentelemetry.io/otel v1.44.0 // indirect
+	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	golang.org/x/mod v0.42.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/text v0.44.0 // indirect

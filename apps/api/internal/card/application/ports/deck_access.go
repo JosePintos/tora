@@ -18,4 +18,9 @@ type DeckAccess interface {
 	// EnsureOwnsDeck returns nil if userID owns deckID, ErrDeckNotFound if the
 	// deck is missing or owned by someone else, or another error on failure.
 	EnsureOwnsDeck(ctx context.Context, userID, deckID uuid.UUID) error
+
+	// EnsureOwnsDecks is the batch version of EnsureOwnsDeck: one check for many
+	// decks, so batch loading doesn't need one ownership query per deck. It
+	// returns ErrDeckNotFound if any deck is missing or owned by someone else.
+	EnsureOwnsDecks(ctx context.Context, userID uuid.UUID, deckIDs []uuid.UUID) error
 }
